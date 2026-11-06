@@ -82,7 +82,7 @@ type SolanaSignIn = Extract<Parameters<typeof supabase.auth.signInWithWeb3>[0], 
  * Manually logs a user into Supabase using a Solana signature.
  * Bypasses Supabase's automatic SIWS formatting bugs.
  */
-export async function signInWithWalletManual(
+/* export async function signInWithWalletManual(
   address: string, 
   signMessageFn: (msg: Uint8Array) => Promise<Uint8Array>
 ): Promise<string> {
@@ -109,8 +109,29 @@ export async function signInWithWalletManual(
   }
 
   return data?.session?.access_token || '';
-}
+} */
 
+
+/**
+ * Prompts the wallet for a SIWS signature and creates a Supabase session.
+ * Pass the wallet adapter signer from WalletStore.signer().
+ */
+export async function signInWithWallet(wallet?: {
+	publicKey: { toBase58(): string; toBytes(): Uint8Array };
+	signMessage(message: Uint8Array): Promise<Uint8Array>;
+}): Promise<string> {
+	const { data, error } = await supabase.auth.signInWithWeb3({
+		chain: 'solana',
+		statement:
+			'Sign in to Float. This only proves wallet ownership; it does not move funds or grant permissions.',
+		...(wallet ? { wallet: wallet as any } : {})
+	});
+
+	if (error) throw new Error(`Wallet sign-in failed: ${error.message}`);
+	if (!data.session) throw new Error('No session returned from wallet sign-in.');
+
+	return getSessionWallet();
+}
 
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();

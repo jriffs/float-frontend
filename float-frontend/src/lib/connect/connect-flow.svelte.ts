@@ -2,7 +2,7 @@
 // State machine for S1: welcome -> wallet sheet -> signature. Framework-agnostic about navigation:
 // the page passes `onAuthenticated` and decides where to go next. S5 (invite gate) reuses this too.
 
-import { sessionMatchesWallet, signInWithWalletManual } from '#lib/supabase/core.ts';
+import { sessionMatchesWallet, signInWithWallet } from '#lib/supabase/core.ts';
 import { WalletFlowError, reasonFor, type ConnectErrorReason } from '#lib/wallet/errors.ts';
 import type { WalletStore } from '#lib/wallet/wallet.svelte.ts';
 
@@ -167,23 +167,10 @@ export class ConnectFlow {
 				throw new Error('No verified wallet address found in store.');
 			}
 
-			// 1. Double-cast through 'unknown' to completely override the broken type lookup loop
-			const signer = this.#wallet.signer() as unknown as {
-				publicKey: any;
-				signMessage: (message: Uint8Array) => Promise<Uint8Array>
-			};
-
-			// 2. Safely call your manual signing processor pipeline
-			const supabaseToken = await signInWithWalletManual(
-				walletAddress,
-				signer.signMessage
-			);
-
-			// 3. Route on success
+			await signInWithWallet(this.#wallet.signer());
 			await this.#onAuthenticated(walletAddress);
-
 		} catch (e) {
-			console.error("Manual Authentication redirect failed:", e);
+			console.error('Authentication failed:', e);
 			this.sign = reasonFor(e) === 'cancelled' ? 'rejected' : 'failed';
 		}
 	}
