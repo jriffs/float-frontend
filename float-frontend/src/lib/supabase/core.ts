@@ -117,20 +117,41 @@ type SolanaSignIn = Extract<Parameters<typeof supabase.auth.signInWithWeb3>[0], 
  * Pass the wallet adapter signer from WalletStore.signer().
  */
 export async function signInWithWallet(wallet?: {
-	publicKey: { toBase58(): string; toBytes(): Uint8Array };
-	signMessage(message: Uint8Array): Promise<Uint8Array>;
+  publicKey: { toBase58(): string; toBytes(): Uint8Array };
+  signMessage(message: Uint8Array): Promise<Uint8Array>;
 }): Promise<string> {
-	const { data, error } = await supabase.auth.signInWithWeb3({
-		chain: 'solana',
-		statement:
-			'Sign in to Float. This only proves wallet ownership; it does not move funds or grant permissions.',
-		...(wallet ? { wallet: wallet as any } : {})
-	});
+  if (!wallet) throw new Error('No wallet provided');
 
-	if (error) throw new Error(`Wallet sign-in failed: ${error.message}`);
-	if (!data.session) throw new Error('No session returned from wallet sign-in.');
+  const url = new URL(window.location.href);
+  const address = wallet.publicKey.toBase58();
+  const statement =
+    'Sign in to Float. This only proves wallet ownership; it does not move funds or grant permissions.';
 
-	return getSessionWallet();
+  // Order and shape that Phantom’s SIWS validator accepts
+  const message = [
+    `${url.host} wants you to sign in with your Solana account:`,
+    address,
+    '',
+    statement,
+    '',
+    `URI: ${url.origin}/`,          // origin (no path) is safest
+    'Version: 1',
+    `Issued At: ${new Date().toISOString()}`,
+  ].join('\n');
+
+  const messageBytes = new TextEncoder().encode(message);
+  const signature = await wallet.signMessage(messageBytes);
+
+  const { data, error } = await supabase.auth.signInWithWeb3({
+    chain: 'solana',
+    message,
+    signature, // Uint8Array is fine; SDK base64url-encodes it
+  } as any);
+
+  if (error) throw new Error(`Wallet sign-in failed: ${error.message}`);
+  if (!data.session) throw new Error('No session returned from wallet sign-in.');
+
+  return getSessionWallet();
 }
 
 export async function signOut(): Promise<void> {
