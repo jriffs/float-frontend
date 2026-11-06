@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/fredoka';
+@import '@fontsource-variable/nunito';
+
+/* Float design tokens (FoundationsV2). Static so every var is always emitted. */
+@theme static {
+	--font-display: 'Fredoka Variable', ui-rounded, system-ui, sans-serif;
+	--font-sans: 'Nunito Variable', system-ui, sans-serif;
+
+	--color-canvas: #0b1220;
+	--color-surface: #131c2e;
+	--color-raised: #1f2c47;
+	--color-raised-2: #2b3c60;
+	--color-sink: #0a101c;
+	--color-ink: #e8eef8;
+	--color-mute: #9aa8c3;
+
+	--color-primary: #22d3c5;
+	--color-primary-edge: #129b90;
+	--color-on-primary: #06201e;
+
+	--color-mint: #4ade80; /* owed to you */
+	--color-coral: #ff7a6b; /* you owe */
+	--color-amber: #f5b83d; /* yield only */
+	--color-amber-edge: #b07f14;
+	--color-ocean: #3b82f6;
+	--color-blush: #f472b6;
+	--color-tangerine: #fb923c;
+	--color-grape: #a78bfa;
+}
+
+@theme {
+	--animate-bob: bob 3.2s ease-in-out infinite;
+	--animate-pulse-ring: pulse-ring 1.8s ease-out infinite;
+	--animate-shimmer: shimmer 1.6s linear infinite;
+
+	@keyframes bob {
+		0%,
+		100% {
+			transform: translateY(0) rotate(-4deg);
+		}
+		50% {
+			transform: translateY(-6px) rotate(3deg);
+		}
+	}
+	@keyframes pulse-ring {
+		0% {
+			box-shadow: 0 0 0 0 rgb(245 184 61 / 0.55);
+		}
+		100% {
+			box-shadow: 0 0 0 10px rgb(245 184 61 / 0);
+		}
+	}
+	@keyframes shimmer {
+		0% {
+			background-position: -200% 0;
+		}
+		100% {
+			background-position: 200% 0;
+		}
+	}
+}
+
+/* Brand gradients, reused for logo tiles, avatars and icon tiles */
+@utility grad-brand {
+	background-image: linear-gradient(135deg, #22d3c5, #3b82f6);
+}
+@utility grad-yield {
+	background-image: linear-gradient(135deg, #f5b83d, #fb923c);
+}
+@utility grad-pink {
+	background-image: linear-gradient(135deg, #f472b6, #fb923c);
+}
+@utility grad-violet {
+	background-image: linear-gradient(135deg, #a78bfa, #22d3c5);
+}
+
+@layer base {
+	html {
+		background: var(--color-canvas);
+		color: var(--color-ink);
+		-webkit-tap-highlight-color: transparent;
+	}
+	body {
+		font-family: var(--font-sans);
+		font-weight: 600;
+	}
+	:focus-visible {
+		outline: 3px solid rgb(34 211 197 / 0.6);
+		outline-offset: 2px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	::before,
+	::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
