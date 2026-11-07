@@ -8,10 +8,10 @@ import { WalletReadyState, type BaseMessageSignerWalletAdapter } from '@solana/w
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import { BackpackWalletAdapter } from '@solana/wallet-adapter-backpack';
-import type { signInWithWalletManual } from '#lib/supabase/core.ts';
+import type { signInWithWallet } from '#lib/supabase/core.ts';
 import { WalletFlowError } from './errors';
 
-type SupabaseWallet = NonNullable<Parameters<typeof signInWithWalletManual>[0]>;
+type SupabaseWallet = NonNullable<Parameters<typeof signInWithWallet>[0]>;
 
 export interface WalletOption {
 	name: string;
