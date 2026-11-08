@@ -2,6 +2,8 @@
 // State machine for S5: gate → preview → pending → done (or error).
 // UI-complete mock: no on-chain client; delays simulate wallet approve + join.
 
+import type { BaseMessageSignerWalletAdapter } from "@solana/wallet-adapter-base";
+
 export type JoinStep = 'boot' | 'gate' | 'preview' | 'pending' | 'done' | 'error';
 
 export type PendingPhase =
@@ -30,10 +32,16 @@ export interface JoinMember {
 export interface JoinPreview {
 	pubkey: string;
 	name: string;
+	creator: string;
 	creatorName: string;
 	memberCount: number;
 	poolEnabled: boolean;
-	members: JoinMember[];
+	members: {
+		wallet: string;
+		displayName: string;
+		role?: 'creator' | 'member';
+		isYou?: boolean;
+	}[];
 }
 
 /** Demo query values for ?g= to force error paths offline. */
@@ -63,21 +71,9 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 	});
 }
 
-function mockPreview(pubkey: string): JoinPreview {
-	// Stable mock for any real-looking pubkey.
-	return {
-		pubkey,
-		name: 'Cape Town 2026',
-		creatorName: 'Kofi',
-		memberCount: 4,
-		poolEnabled: true,
-		members: [
-			{ wallet: 'Kofi111', displayName: 'Kofi', role: 'creator' },
-			{ wallet: 'Lena222', displayName: 'Lena' },
-			{ wallet: 'Dev333', displayName: 'Dev' },
-			{ wallet: 'Tunde44', displayName: 'Tunde' }
-		]
-	};
+
+function shortAddr(pk: string): string {
+	return `${pk.slice(0, 4)}…${pk.slice(-4)}`;
 }
 
 export class JoinFlow {
@@ -86,6 +82,10 @@ export class JoinFlow {
 	errorReason = $state<JoinErrorReason | null>(null);
 	preview = $state<JoinPreview | null>(null);
 	busy = $state(false);
+
+	creatorParam = $state<string | null>(null);
+	nameParam = $state<string | null>(null);
+	adapter: BaseMessageSignerWalletAdapter | null = null;
 
 	/** Wallet address when connected; null on the gate. */
 	walletAddress = $state<string | null>(null);
@@ -97,39 +97,109 @@ export class JoinFlow {
 	 * Call once on mount with the `g` query param and current wallet (if any).
 	 * Resolves gate vs preview vs error without chain calls.
 	 */
-	bootstrap(groupParam: string | null, wallet: string | null): void {
-		this.#rawParam = groupParam?.trim() || null;
-		this.walletAddress = wallet;
-
-		if (!this.#rawParam) {
-			this.errorReason = 'invalid-link';
-			this.step = 'error';
-			return;
-		}
-
-		const key = this.#rawParam.toLowerCase();
-
-		if (key === DEMO.INVALID || key === 'bad' || key.length < 3) {
-			this.errorReason = 'invalid-link';
-			this.step = 'error';
-			return;
-		}
-		if (key === DEMO.CLOSED) {
-			this.preview = mockPreview(this.#rawParam);
-			this.errorReason = 'closed';
-			this.step = 'error';
-			return;
-		}
-		if (key === DEMO.MEMBER) {
-			this.preview = mockPreview(this.#rawParam);
-			this.errorReason = 'already-member';
-			this.step = 'error';
-			return;
-		}
-
-		this.preview = mockPreview(this.#rawParam);
+	async bootstrap(opts: {
+		creator: string | null;
+		name: string | null;
+		groupPubkeyHint?: string | null;
+		wallet: string | null;
+	}): Promise<void> {
+		this.walletAddress = opts.wallet;
+		this.creatorParam = opts.creator?.trim() || null;
+		this.nameParam = opts.name?.trim() || null;
 		this.errorReason = null;
-		this.step = wallet ? 'preview' : 'gate';
+		this.preview = null;
+		this.step = 'boot';
+
+		if (!this.creatorParam || !this.nameParam) {
+			this.errorReason = 'invalid-link';
+			this.step = 'error';
+			return;
+		}
+
+		let creatorPk: import('@solana/web3.js').PublicKey;
+		try {
+			const { PublicKey } = await import('@solana/web3.js');
+			creatorPk = new PublicKey(this.creatorParam);
+		} catch {
+			this.errorReason = 'invalid-link';
+			this.step = 'error';
+			return;
+		}
+
+		try {
+			const { groupPda, fetchGroup, fetchGroupMembers } = await import('#lib/program/client.ts');
+
+			const groupPk = groupPda(creatorPk, this.nameParam);
+
+			if (opts.groupPubkeyHint) {
+				try {
+					const { PublicKey } = await import('@solana/web3.js');
+					const hint = new PublicKey(opts.groupPubkeyHint);
+					if (hint.toBase58() !== groupPk.toBase58()) {
+						this.errorReason = 'invalid-link';
+						this.step = 'error';
+						return;
+					}
+				} catch {
+					this.errorReason = 'invalid-link';
+					this.step = 'error';
+					return;
+				}
+			}
+
+			const g = await fetchGroup(groupPk);
+			if (!g) {
+				this.errorReason = 'invalid-link';
+				this.step = 'error';
+				return;
+			}
+
+			const balances = await fetchGroupMembers(groupPk);
+
+			const preview = {
+				pubkey: groupPk.toBase58(),
+				name: g.name || this.nameParam,
+				creator: g.creator.toBase58(),
+				creatorName: shortAddr(g.creator.toBase58()),
+				memberCount: g.memberCount,
+				poolEnabled: g.poolEnabled,
+				members: balances.map((m) => ({
+					wallet: m.member.toBase58(),
+					displayName: shortAddr(m.member.toBase58()),
+					role: (m.member.equals(g.creator) ? 'creator' : 'member') as 'creator' | 'member'
+				}))
+			};
+
+			// Closed / not active
+			if (g.status !== 0) {
+				this.preview = preview;
+				this.errorReason = 'closed';
+				this.step = 'error';
+				return;
+			}
+
+			// Already a member
+			if (opts.wallet) {
+				const already = balances.some((m) => m.member.toBase58() === opts.wallet);
+				if (already) {
+					this.preview = preview;
+					this.errorReason = 'already-member';
+					this.step = 'error';
+					return;
+				}
+			}
+
+			this.preview = preview;
+			this.step = opts.wallet ? 'preview' : 'gate';
+		} catch (e) {
+			console.error(e);
+			this.errorReason = 'network';
+			this.step = 'error';
+		}
+	}
+
+	setAdapter(a: BaseMessageSignerWalletAdapter | null) {
+		this.adapter = a;
 	}
 
 	/** After wallet connects on the gate, move to preview (or re-check demo errors). */
@@ -141,24 +211,19 @@ export class JoinFlow {
 	}
 
 	/** Start join: mock pending sequence. */
-	async submit(): Promise<void> {
+	async submit() {
 		if (!this.preview || this.busy) return;
-
-		const key = (this.#rawParam ?? '').toLowerCase();
-		if (key === DEMO.NOSOL) {
-			this.errorReason = 'no-sol';
-			this.step = 'error';
-			return;
-		}
-		if (key === DEMO.FAIL) {
-			this.errorReason = 'network';
+		if (!this.creatorParam || !this.nameParam) {
+			this.errorReason = 'invalid-link';
 			this.step = 'error';
 			return;
 		}
 
-		this.#abort?.abort();
-		this.#abort = new AbortController();
-		const { signal } = this.#abort;
+		const ad = this.adapter;
+		if (!ad?.publicKey) {
+			this.step = 'gate';
+			return;
+		}
 
 		this.busy = true;
 		this.errorReason = null;
@@ -166,25 +231,39 @@ export class JoinFlow {
 		this.step = 'pending';
 
 		try {
-			await sleep(400, signal);
 			this.pendingPhase = 'approve';
-			await sleep(1300, signal);
+
+			const { joinGroup } = await import('#lib/program/client.ts');
+			const { PublicKey } = await import('@solana/web3.js');
+
+			await joinGroup({
+				adapter: ad,
+				creator: new PublicKey(this.creatorParam),
+				name: this.nameParam
+			});
+
 			this.pendingPhase = 'joining';
-			await sleep(1000, signal);
 			this.pendingPhase = 'setup';
-			await sleep(600, signal);
 			this.step = 'done';
 		} catch (e) {
-			if (e instanceof DOMException && e.name === 'AbortError') {
+			const { mapProgramError } = await import('#lib/program/errors.ts');
+			const err = mapProgramError(e);
+			const msg = err.message.toLowerCase();
+
+			if (msg.includes('declined') || msg.includes('reject')) {
 				this.errorReason = 'declined';
-				this.step = 'error';
+			} else if (err.code === 6010 || msg.includes('already')) {
+				this.errorReason = 'already-member';
+			} else if (err.code === 6001 || err.code === 6002) {
+				this.errorReason = 'closed';
+			} else if (msg.includes('sol') || msg.includes('insufficient funds')) {
+				this.errorReason = 'no-sol';
 			} else {
 				this.errorReason = 'network';
-				this.step = 'error';
 			}
+			this.step = 'error';
 		} finally {
 			this.busy = false;
-			this.#abort = null;
 		}
 	}
 

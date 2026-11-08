@@ -2,10 +2,14 @@ import adapter from '@sveltejs/adapter-auto';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
-import inject from '@rollup/plugin-inject';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig({
 	plugins: [
+		nodePolyfills({
+			include: ['buffer'],
+			globals: { Buffer: true, global: true, process: true }
+		}),
 		tailwindcss(),
 		sveltekit({
 			compilerOptions: {
@@ -19,18 +23,5 @@ export default defineConfig({
 			// See https://svelte.dev/docs/kit/adapters for more information about adapters.
 			adapter: adapter()
 		})
-	],
-	define: {
-		global: 'globalThis',
-	},
-	build: {
-		// 2. Rollup configuration to bundle the polyfill for production builds
-		rollupOptions: {
-			plugins: [
-				inject({
-					Buffer: ['buffer', 'Buffer']
-				})
-			],
-		},
-	}
+	]
 });
