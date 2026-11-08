@@ -45,9 +45,13 @@
 
 		try {
 			const profile = await getProfile(wallet.address);
+			if (!profile) {
+				await goto(resolve("/onboarding"), { replaceState: true });
+				return;
+			}
 			avatar = avatarUrl(profile);
 		} catch {
-			/* header avatar is decorative */
+			/* header avatar is decorative; still try to load groups */
 		}
 
 		await refresh();

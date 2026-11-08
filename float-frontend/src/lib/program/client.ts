@@ -93,6 +93,19 @@ export async function fetchGroupMembers(group: PublicKey): Promise<MemberBalance
 	return accounts.map((a) => decodeMemberBalance(a.pubkey, Buffer.from(a.account.data)));
 }
 
+/** All MemberBalance accounts owned by `member` (memcmp on member field at offset 40). */
+export async function fetchWalletMemberBalances(
+	member: PublicKey
+): Promise<MemberBalanceAccount[]> {
+	const accounts = await connection().getProgramAccounts(FLOAT_PROGRAM_ID, {
+		filters: [
+			{ dataSize: 8 + 32 + 32 + 8 + 8 + 8 + 1 },
+			{ memcmp: { offset: 40, bytes: member.toBase58() } }
+		]
+	});
+	return accounts.map((a) => decodeMemberBalance(a.pubkey, Buffer.from(a.account.data)));
+}
+
 export async function fetchExpense(
 	group: PublicKey,
 	index: number

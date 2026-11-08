@@ -1,12 +1,16 @@
 /**
  * Groups list data loader.
- *
- * On-chain program reads are not wired in the frontend yet. This module
- * exposes a stable API (`loadGroups`) and a mock implementation so Screen 3
- * can be built and demoed. Swap the body of `fetchGroupsFromChain` when the
- * Anchor client lands — UI components stay untouched.
+ * Reads MemberBalance PDAs for the wallet, then each Group account.
  */
 
+import { PublicKey } from '@solana/web3.js';
+import {
+	fetchWalletMemberBalances,
+	fetchGroup,
+	fetchGroupMembers
+} from '#lib/program/client.ts';
+import { GROUP_STATUS } from '#lib/program/constants.ts';
+import { getProfiles, avatarUrl } from '#lib/supabase/profiles.ts';
 import type { GroupListItem, GroupsLoadState, GroupsSummary } from './types';
 
 const CACHE_KEY = 'float:groups-cache-v1';
@@ -28,8 +32,8 @@ function computeSummary(groups: GroupListItem[]): GroupsSummary {
 		else if (g.myBalance < 0) youOwe += -g.myBalance;
 		if (g.poolEarning) {
 			anyPoolEarning = true;
-			// Placeholder until harvest_yield is wired: tiny decorative estimate.
-			estYield += 7_134; // $0.007134 in minor units for demo
+			// Decorative until harvest_yield is wired
+			estYield += 0;
 		}
 	}
 
@@ -61,61 +65,87 @@ function writeCache(groups: GroupListItem[], summary: GroupsSummary): void {
 	}
 }
 
-/** Demo data matching S3List design. Remove once chain is live. */
-function mockGroups(): GroupListItem[] {
-	return [
-		{
-			pubkey: 'CapeTown2026MockPubkey1111111111111111111',
-			name: 'Cape Town 2026',
-			memberCount: 5,
-			members: [
-				{ wallet: 'Amara111' },
-				{ wallet: 'Kofi2222' },
-				{ wallet: 'Zara3333' },
-				{ wallet: 'Tunde444' }
-			],
-			myBalance: 42_500_000, // +$42.50
-			poolEnabled: true,
-			poolEarning: true,
-			icon: 'trip'
-		},
-		{
-			pubkey: 'LagosFlatMockPubkey22222222222222222222',
-			name: 'Lagos Flat',
-			memberCount: 3,
-			members: [{ wallet: 'Amara111' }, { wallet: 'Bola5555' }, { wallet: 'Chi66666' }],
-			myBalance: -18_800_000, // −$18.80
-			poolEnabled: false,
-			poolEarning: false,
-			icon: 'home'
-		},
-		{
-			pubkey: 'WeekendHikeMockPubkey333333333333333333',
-			name: 'Weekend Hike',
-			memberCount: 4,
-			members: [
-				{ wallet: 'Amara111' },
-				{ wallet: 'Dee77777' },
-				{ wallet: 'Efe88888' },
-				{ wallet: 'Fola9999' }
-			],
-			myBalance: 0,
-			poolEnabled: false,
-			poolEarning: false,
-			icon: 'hike'
-		}
-	];
+function iconForName(name: string): GroupListItem['icon'] {
+	const n = name.toLowerCase();
+	if (/\b(hike|trail|trek|camp)\b/.test(n)) return 'hike';
+	if (/\b(flat|apt|house|home|rent)\b/.test(n)) return 'home';
+	if (/\b(trip|travel|vacation|tour|cape|lagos)\b/.test(n)) return 'trip';
+	return 'default';
 }
 
 /**
- * Replace this with real PDA scans + MemberBalance reads.
- * Signature stays the same so the page does not change.
+ * On-chain: MemberBalance(s) for wallet → Group + members for each.
  */
-async function fetchGroupsFromChain(_wallet: string): Promise<GroupListItem[]> {
-	// TODO(chain): fetch Group + MemberBalance PDAs for this wallet.
-	// For now return design-faithful mock data so the UI is demoable.
-	await new Promise((r) => setTimeout(r, 450));
-	return mockGroups();
+async function fetchGroupsFromChain(wallet: string): Promise<GroupListItem[]> {
+	const member = new PublicKey(wallet);
+	const myBalances = await fetchWalletMemberBalances(member);
+	if (myBalances.length === 0) return [];
+
+	const items: GroupListItem[] = [];
+
+	// Parallel group + member list fetches
+	const rows = await Promise.all(
+		myBalances.map(async (mb) => {
+			const [group, members] = await Promise.all([
+				fetchGroup(mb.group),
+				fetchGroupMembers(mb.group)
+			]);
+			return { mb, group, members };
+		})
+	);
+
+	// Optional: enrich display names / avatars from Supabase
+	const allWallets = new Set<string>();
+	for (const row of rows) {
+		if (!row.group) continue;
+		for (const m of row.members) allWallets.add(m.member.toBase58());
+	}
+	let profileMap = new Map<string, Awaited<ReturnType<typeof getProfiles>> extends Map<infer K, infer V> ? V : never>();
+	try {
+		profileMap = await getProfiles([...allWallets]);
+	} catch {
+		/* profiles are decorative; chain data still shows */
+	}
+
+	for (const { mb, group, members } of rows) {
+		if (!group) continue;
+		// Skip closed groups on the home list
+		if (group.status === GROUP_STATUS.Closed) continue;
+
+		const preview = members
+			.filter((m) => m.member.toBase58() !== wallet)
+			.slice(0, 4)
+			.map((m) => {
+				const w = m.member.toBase58();
+				const p = profileMap.get(w);
+				return {
+					wallet: w,
+					displayName: p?.display_name ?? null,
+					avatarUrl: avatarUrl(p)
+				};
+			});
+
+		items.push({
+			pubkey: group.pubkey.toBase58(),
+			name: group.name,
+			memberCount: group.memberCount,
+			members: preview,
+			myBalance: mb.balance,
+			poolEnabled: group.poolEnabled,
+			// Until pool account is decoded: treat enabled as "earning" signal
+			poolEarning: group.poolEnabled,
+			icon: iconForName(group.name)
+		});
+	}
+
+	// Stable order: most recently relevant first (highest |balance|, then name)
+	items.sort((a, b) => {
+		const byBal = Math.abs(b.myBalance) - Math.abs(a.myBalance);
+		if (byBal !== 0) return byBal;
+		return a.name.localeCompare(b.name);
+	});
+
+	return items;
 }
 
 export async function loadGroups(wallet: string): Promise<GroupsLoadState> {
