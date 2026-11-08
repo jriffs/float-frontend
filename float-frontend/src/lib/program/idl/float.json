@@ -1,0 +1,2186 @@
+{
+  "address": "GUFWB2jfAK5e8QSra1d2XrqrwBCBr7k3f2FwDWr8CE8m",
+  "metadata": {
+    "name": "float",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "close_group",
+      "discriminator": [
+        40,
+        187,
+        201,
+        187,
+        18,
+        194,
+        122,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "create_group",
+      "discriminator": [
+        79,
+        60,
+        158,
+        134,
+        61,
+        199,
+        56,
+        248
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "member_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "settlement_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "deploy_to_kamino",
+      "discriminator": [
+        179,
+        81,
+        248,
+        134,
+        98,
+        17,
+        216,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator_authority"
+        },
+        {
+          "name": "group",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "pool_token_account",
+          "docs": [
+            "Pool's underlying token ATA (authority = Pool PDA)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "pool_shares_account",
+          "docs": [
+            "Pool's Kamino shares ATA (authority = Pool PDA)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "shares_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "shares_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vault_state",
+          "writable": true
+        },
+        {
+          "name": "token_vault",
+          "writable": true
+        },
+        {
+          "name": "base_vault_authority"
+        },
+        {
+          "name": "shares_mint",
+          "writable": true
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "kvault_program",
+          "address": "devkRngFnfp4gBc5a3LsadgbQKdPo8MSZ4prFiNSVmY"
+        },
+        {
+          "name": "klend_program",
+          "address": "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "shares_token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "depositor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator"
+        },
+        {
+          "name": "group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
+          "name": "member_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "depositor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "depositor_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "depositor"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "enable_pool",
+      "discriminator": [
+        120,
+        47,
+        0,
+        69,
+        84,
+        74,
+        16,
+        177
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "harvest_yield",
+      "discriminator": [
+        28,
+        200,
+        150,
+        200,
+        69,
+        56,
+        38,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true
+        },
+        {
+          "name": "creator_authority"
+        },
+        {
+          "name": "group",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "pool_token_account",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "join_group",
+      "discriminator": [
+        121,
+        56,
+        199,
+        19,
+        250,
+        70,
+        44,
+        184
+      ],
+      "accounts": [
+        {
+          "name": "member",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "member_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "member"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "log_expense",
+      "discriminator": [
+        69,
+        135,
+        36,
+        30,
+        155,
+        128,
+        211,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "payer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "expense",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  101,
+                  110,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "group.expense_count",
+                "account": "Group"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "shares",
+          "type": {
+            "vec": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "recall_from_kamino",
+      "discriminator": [
+        133,
+        175,
+        209,
+        248,
+        145,
+        104,
+        47,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator_authority"
+        },
+        {
+          "name": "group",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator_authority"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "pool_token_account",
+          "docs": [
+            "Pool's underlying token ATA (authority = Pool PDA). Receives redeemed funds."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "pool_shares_account",
+          "docs": [
+            "Pool's Kamino shares ATA (authority = Pool PDA). Must be fully burned."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "shares_token_program"
+              },
+              {
+                "kind": "account",
+                "path": "shares_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "vault_state",
+          "writable": true
+        },
+        {
+          "name": "global_config"
+        },
+        {
+          "name": "token_vault",
+          "writable": true
+        },
+        {
+          "name": "base_vault_authority"
+        },
+        {
+          "name": "shares_mint",
+          "writable": true
+        },
+        {
+          "name": "invested_vault_state",
+          "writable": true
+        },
+        {
+          "name": "reserve",
+          "writable": true
+        },
+        {
+          "name": "ctoken_vault",
+          "writable": true
+        },
+        {
+          "name": "lending_market"
+        },
+        {
+          "name": "lending_market_authority"
+        },
+        {
+          "name": "reserve_liquidity_supply",
+          "writable": true
+        },
+        {
+          "name": "reserve_collateral_mint",
+          "writable": true
+        },
+        {
+          "name": "reserve_collateral_token_program"
+        },
+        {
+          "name": "instruction_sysvar_account"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "kvault_program",
+          "address": "devkRngFnfp4gBc5a3LsadgbQKdPo8MSZ4prFiNSVmY"
+        },
+        {
+          "name": "klend_program",
+          "address": "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "shares_token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "settle",
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "settler",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator"
+        },
+        {
+          "name": "group",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "from_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "settler"
+              }
+            ]
+          }
+        },
+        {
+          "name": "to_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "to_balance.member",
+                "account": "MemberBalance"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "from_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "settler"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "to_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "to_balance.member",
+                "account": "MemberBalance"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "member",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator"
+        },
+        {
+          "name": "group",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  114,
+                  111,
+                  117,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "group_name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              }
+            ]
+          }
+        },
+        {
+          "name": "member_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "path": "member"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_mint"
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "member_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "member"
+              },
+              {
+                "kind": "account",
+                "path": "token_program"
+              },
+              {
+                "kind": "account",
+                "path": "settlement_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "group_name",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Expense",
+      "discriminator": [
+        49,
+        167,
+        206,
+        160,
+        209,
+        254,
+        24,
+        100
+      ]
+    },
+    {
+      "name": "Group",
+      "discriminator": [
+        209,
+        249,
+        208,
+        63,
+        182,
+        89,
+        186,
+        254
+      ]
+    },
+    {
+      "name": "MemberBalance",
+      "discriminator": [
+        255,
+        57,
+        221,
+        209,
+        238,
+        141,
+        216,
+        107
+      ]
+    },
+    {
+      "name": "Pool",
+      "discriminator": [
+        241,
+        154,
+        109,
+        4,
+        17,
+        177,
+        109,
+        188
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NameTooLong",
+      "msg": "Group name too long"
+    },
+    {
+      "code": 6001,
+      "name": "GroupNotActive",
+      "msg": "Group is not active"
+    },
+    {
+      "code": 6002,
+      "name": "GroupAlreadyClosed",
+      "msg": "Group is already closed"
+    },
+    {
+      "code": 6003,
+      "name": "PoolNotEnabled",
+      "msg": "Pool is not enabled"
+    },
+    {
+      "code": 6004,
+      "name": "PoolAlreadyEnabled",
+      "msg": "Pool is already enabled"
+    },
+    {
+      "code": 6005,
+      "name": "PoolIsDeployed",
+      "msg": "Pool funds are currently deployed to Kamino"
+    },
+    {
+      "code": 6006,
+      "name": "PoolNotDeployed",
+      "msg": "Pool funds are not deployed"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidShares",
+      "msg": "Invalid shares: must sum exactly to amount"
+    },
+    {
+      "code": 6008,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6009,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6010,
+      "name": "MemberAlreadyExists",
+      "msg": "Member already exists"
+    },
+    {
+      "code": 6011,
+      "name": "InsufficientPoolValue",
+      "msg": "Insufficient pool value"
+    },
+    {
+      "code": 6012,
+      "name": "GroupNotClosed",
+      "msg": "Cannot withdraw while group is not closed"
+    },
+    {
+      "code": 6013,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6014,
+      "name": "OutstandingBalances",
+      "msg": "Cannot close group while member balances remain unsettled"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidPoolState",
+      "msg": "Pool account is missing or inconsistent with group state"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidSettlementMint",
+      "msg": "Settlement mint does not match the group's configured mint"
+    },
+    {
+      "code": 6017,
+      "name": "KaminoAccountMissing",
+      "msg": "A required Kamino account was not supplied"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidKaminoProgram",
+      "msg": "Invalid Kamino program account"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidKaminoVault",
+      "msg": "Kamino vault does not match the configured pool vault"
+    }
+  ],
+  "types": [
+    {
+      "name": "Expense",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "description",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "expense_index",
+            "type": "u32"
+          },
+          {
+            "name": "participant_count",
+            "type": "u8"
+          },
+          {
+            "name": "paid_from_pool",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Group",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "settlement_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "member_count",
+            "type": "u8"
+          },
+          {
+            "name": "unsettled_member_count",
+            "type": "u8"
+          },
+          {
+            "name": "expense_count",
+            "type": "u32"
+          },
+          {
+            "name": "pool_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MemberBalance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "i64"
+          },
+          {
+            "name": "deposited_principal",
+            "type": "u64"
+          },
+          {
+            "name": "pool_shares",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "group",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_shares",
+            "type": "u64"
+          },
+          {
+            "name": "total_value",
+            "type": "u64"
+          },
+          {
+            "name": "total_principal",
+            "type": "u64"
+          },
+          {
+            "name": "kamino_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "last_harvest_ts",
+            "type": "i64"
+          },
+          {
+            "name": "is_deployed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

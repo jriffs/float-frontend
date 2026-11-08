@@ -1,6 +1,10 @@
 // src/lib/create-group/create-flow.svelte.ts
 // State machine for S4: form → pending → invite (or error). UI-complete mock:
 // no on-chain client; delays simulate wallet approve + create + invite setup.
+import { PublicKey } from '@solana/web3.js';
+import { createGroup } from '#lib/program/client.ts';
+import { mapProgramError, FloatProgramError } from '#lib/program/errors.ts';
+import type { BaseMessageSignerWalletAdapter } from '@solana/wallet-adapter-base';
 
 export type CreateStep = 'form' | 'pending' | 'invite' | 'error';
 
@@ -18,10 +22,11 @@ export type CreateErrorReason =
 	| 'setup-incomplete';
 
 export interface CreatedGroup {
-	/** Mock base58-looking PDA for invite links and navigation. */
-	pubkey: string;
+	pubkey: string;       // group PDA base58
 	name: string;
+	creator: string;      // your wallet base58
 	poolEnabled: boolean;
+	signature?: string;
 }
 
 const NAME_MAX = 32;
@@ -72,6 +77,8 @@ export class CreateFlow {
 	errorReason = $state<CreateErrorReason | null>(null);
 	created = $state<CreatedGroup | null>(null);
 
+	adapter: BaseMessageSignerWalletAdapter | null = null;
+
 	/** True while the mock create sequence is running. */
 	busy = $state(false);
 
@@ -119,33 +126,26 @@ export class CreateFlow {
 		this.poolHelpOpen = !this.poolHelpOpen;
 	}
 
+	setAdapter(a: BaseMessageSignerWalletAdapter | null) {
+		this.adapter = a;
+	}
+
 	/** Start create: validate, then run the mock pending sequence. */
-	async submit(): Promise<void> {
+	async submit() {
 		if (!this.canSubmit) return;
 
-		const trimmed = this.trimmedName;
-		const key = trimmed.toLowerCase();
+		// keep your demo name shortcuts if you want, or delete them
 
-		// Demo error shortcuts (exact names, case-insensitive).
-		if (key === DEMO_NAME_TAKEN) {
-			this.errorReason = 'name-taken';
-			this.step = 'form';
-			return;
-		}
-		if (key === DEMO_NO_SOL) {
-			this.errorReason = 'no-sol';
-			this.step = 'error';
-			return;
-		}
-		if (key === DEMO_NETWORK) {
-			this.errorReason = 'network';
+		const ad = this.adapter;
+		if (!ad?.publicKey) {
+			this.errorReason = 'network'; // or a dedicated 'no-wallet'
 			this.step = 'error';
 			return;
 		}
 
 		this.#abort?.abort();
 		this.#abort = new AbortController();
-		const { signal } = this.#abort;
+		// optional: still listen for cancel → declined
 
 		this.busy = true;
 		this.errorReason = null;
@@ -154,32 +154,47 @@ export class CreateFlow {
 		this.step = 'pending';
 
 		try {
-			await sleep(450, signal);
 			this.pendingPhase = 'approve';
-			await sleep(1400, signal);
-			this.pendingPhase = 'creating';
-			await sleep(1100, signal);
+
+			const { signature, group } = await createGroup({
+				adapter: ad,
+				name: this.trimmedName
+				// settlementMint omitted → Devnet USDC from constants
+			});
+
+			this.pendingPhase = 'creating'; // or jump straight after confirm
+			// tx is already confirmed inside createGroup
+
 			this.pendingPhase = 'invite-setup';
-			await sleep(700, signal);
 
 			this.created = {
-				pubkey: mockPubkey(trimmed),
-				name: trimmed,
-				poolEnabled: this.poolEnabled
+				pubkey: group.toBase58(),
+				name: this.trimmedName,
+				creator: ad.publicKey.toBase58(),
+				poolEnabled: false, // on-chain default until enable_pool
+				signature
 			};
 			this.step = 'invite';
 		} catch (e) {
 			if (e instanceof DOMException && e.name === 'AbortError') {
-				// User cancelled → declined (details kept on form).
 				this.errorReason = 'declined';
-				this.step = 'error';
 			} else {
-				this.errorReason = 'network';
-				this.step = 'error';
+				const err = mapProgramError(e);
+				if (err.message.includes('declined') || err.message.includes('Rejected')) {
+					this.errorReason = 'declined';
+				} else if (err.message.includes('SOL') || err.message.includes('Insufficient')) {
+					this.errorReason = 'no-sol';
+				} else if (err.code === 6000) {
+					// name too long — should be blocked in UI already
+					this.errorReason = 'network';
+				} else {
+					// name collision often surfaces as failed tx / account in use
+					this.errorReason = 'network'; // or 'name-taken' if you detect it
+				}
 			}
+			this.step = 'error';
 		} finally {
 			this.busy = false;
-			this.#abort = null;
 		}
 	}
 
@@ -229,12 +244,15 @@ export class CreateFlow {
 	}
 
 	inviteUrl(origin: string): string {
-		const pk = this.created?.pubkey;
-		if (!pk) return '';
-		// Path matches the existing /groups/join route stub.
-		return `${origin}/groups/join?g=${pk}`;
+		if (!this.created) return '';
+		const q = new URLSearchParams({
+			creator: this.created.creator,
+			name: this.created.name
+		});
+		// optional: q.set('g', this.created.pubkey);
+		return `${origin}/groups/join?${q.toString()}`;
 	}
-
+	
 	shortInvitePath(): string {
 		const pk = this.created?.pubkey;
 		if (!pk) return '';
