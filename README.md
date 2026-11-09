@@ -9,6 +9,23 @@
 </p>
 
 ---
+🚨 Live Demo — Still Under Development
+<table>
+  <tr>
+    <td align="center" width="100%">
+      <br>
+      <h2>👉 <a href="https://f5fb6200.floatfinance.pages.dev/">TRY THE LIVE DEMO</a> 👈</h2>
+      <p><strong>https://f5fb6200.floatfinance.pages.dev/</strong></p>
+      <br>
+      <p>⚠️ <strong>The app is still under active development.</strong><br>
+      Only the colored steps below are currently implemented.<br>
+      Greyed-out steps are planned and will light up as they ship.</p>
+      <br>
+    </td>
+  </tr>
+</table>
+
+---
 
 ## The problem is familiar
 
@@ -42,6 +59,102 @@ Imagine Amara planning a weekend in Cape Town with four friends from three count
 8. The creator closes the group; each member withdraws their proportional share of the remaining pool value.
 
 The result: fewer payment chases, a shared record everyone can inspect, and a chance for idle group capital to contribute to the cost of the experience.
+
+---
+
+Implementation Status
+Progress is shown as cards. Color = live today. Grey = not yet implemented.
+1. Bill Splitting Flow
+<table>
+  <tr>
+    <td align="center" width="16%">
+      <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 12px; background: #f0fdf4;">
+        <strong>✅ Wallet Connect</strong><br>
+        <small>Onboarding</small>
+      </div>
+    </td>
+    <td align="center" width="16%">
+      <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 12px; background: #f0fdf4;">
+        <strong>✅ Create Group</strong><br>
+        <small>Name + members</small>
+      </div>
+    </td>
+    <td align="center" width="16%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Join Group</strong><br>
+        <small>Invite link</small>
+      </div>
+    </td>
+    <td align="center" width="16%">
+      <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 12px; background: #f0fdf4;">
+        <strong>✅ Log Expense</strong><br>
+        <small>Equal + custom</small>
+      </div>
+    </td>
+    <td align="center" width="16%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ View Balances</strong><br>
+        <small>Who owes whom</small>
+      </div>
+    </td>
+    <td align="center" width="16%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Settle</strong><br>
+        <small>On-chain USDC</small>
+      </div>
+    </td>
+  </tr>
+</table>
+2. Yield Pool Flow
+<table>
+  <tr>
+    <td align="center" width="14%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Enable Pool</strong><br>
+        <small>Optional</small>
+      </div>
+    </td>
+    <td align="center" width="14%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Deposit</strong><br>
+        <small>USDC → shares</small>
+      </div>
+    </td>
+    <td align="center" width="14%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Deploy</strong><br>
+        <small>to Kamino</small>
+      </div>
+    </td>
+    <td align="center" width="14%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Recall / Harvest</strong><br>
+        <small>Bring funds back</small>
+      </div>
+    </td>
+    <td align="center" width="14%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Use Yield</strong><br>
+        <small>Pay expense</small>
+      </div>
+    </td>
+    <td align="center" width="14%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Close + Withdraw</strong><br>
+        <small>Proportional</small>
+      </div>
+    </td>
+    <td align="center" width="14%">
+      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>⬜ Profiles</strong><br>
+        <small>Name + avatar</small>
+      </div>
+    </td>
+  </tr>
+</table>
+> **How this works:** As soon as a phase ships, we update its card from grey → green. This README becomes the single place to see real progress at a glance.
+
+---
 
 ## Product capabilities
 
