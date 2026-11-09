@@ -130,6 +130,14 @@ Members contribute USDC and receive pool shares representing their proportional 
 
 <sub>Milestone 2 · Deposit</sub>
 
+#### Deploy the pool funds to kamino
+
+The group creator can then deploy the pooled funds to kamino for yeild generation.
+
+![Float UI: deposit into the yield pool](docs/images/yield-pool-02-deploy-to-kamino.png)
+
+<sub>Milestone 2 · Deposit</sub>
+
 #### Withdraw from the pool
 
 After the group is closed, members can withdraw their proportional share of the remaining pool value.
