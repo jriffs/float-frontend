@@ -1,0 +1,5 @@
+## Run scrits on windows
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
+
+Cloudflare Prep, Build $ Deploy
