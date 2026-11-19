@@ -1,4 +1,4 @@
-<!-- Screen 8 — Settle up (UI-complete mock). -->
+<!-- Screen 8 — Settle up -->
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -12,6 +12,7 @@
 	import DoneStep from '#lib/settle/DoneStep.svelte';
 	import ErrorStep from '#lib/settle/ErrorStep.svelte';
 	import NudgeSheet from '#lib/group-detail/NudgeSheet.svelte';
+	import Button from '#lib/components/ui/Button.svelte';
 
 	const wallet = getWalletContext();
 	const pubkey = $derived(page.params.pubkey ?? '');
@@ -21,19 +22,23 @@
 	let nudgePeer = $state<SettlePeer | null>(null);
 
 	onMount(() => {
+		void bootstrap();
+	});
+
+	async function bootstrap() {
 		if (!wallet.address) {
-			void goto(resolve('/'), { replaceState: true });
+			await goto(resolve('/'), { replaceState: true });
 			return;
 		}
-		flow.init(pubkey);
+		flow.setAdapter(wallet.getActiveAdapter() ?? null);
+		await flow.init(pubkey, wallet.address);
 
-		// Optional deep-link: ?peer=Dev44444 opens confirm for that wallet
 		const peerWallet = page.url.searchParams.get('peer');
 		if (peerWallet && flow.group) {
 			const p = flow.group.peers.find((x) => x.wallet === peerWallet && x.netVsYou < 0);
 			if (p) flow.openPay(p);
 		}
-	});
+	}
 
 	function backToGroup() {
 		void goto(resolve('/groups/[pubkey]', { pubkey }));
@@ -45,7 +50,17 @@
 	}
 </script>
 
-{#if flow.step === 'list'}
+{#if flow.loading}
+	<main class="flex min-h-dvh items-center justify-center">
+		<span class="text-sm font-bold text-mute">Loading balances…</span>
+	</main>
+{:else if flow.loadError}
+	<main class="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
+		<p class="font-display text-xl font-semibold">Could not load settle</p>
+		<p class="text-sm font-semibold text-mute">{flow.loadError}</p>
+		<Button onclick={backToGroup}>Back to group</Button>
+	</main>
+{:else if flow.step === 'list'}
 	<ListStep {flow} onback={backToGroup} onnudge={openNudge} />
 {:else if flow.step === 'confirm'}
 	<ConfirmStep {flow} />

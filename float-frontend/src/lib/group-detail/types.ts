@@ -7,30 +7,29 @@ export type DetailTab = 'balances' | 'pool' | 'history';
 export interface DetailMember {
 	wallet: string;
 	displayName: string;
-	/** Net balance of this member vs you, USDC minor units.
-	 *  Positive = they owe you; negative = you owe them; 0 = settled with you. */
+	/** Net vs you, USDC minor units.
+	 *  Positive = they owe you; negative = you owe them; 0 = no direct edge. */
 	netVsYou: number;
 }
 
 export interface GroupDetail {
 	pubkey: string;
+	/** Group creator (base58) — required for settle / log_expense. */
+	creator: string;
 	name: string;
 	memberCount: number;
 	status: GroupStatus;
 	/** Your net across the group, USDC minor units. */
 	myBalance: number;
-	/** Sum of positive peer balances (owed to you). */
+	/** Sum of positive peer netVsYou. */
 	owedToYou: number;
-	/** Sum of absolute negative peer balances (you owe). */
+	/** Sum of absolute negative peer netVsYou. */
 	youOwe: number;
 	poolEnabled: boolean;
 	poolEarning: boolean;
-	/** Estimated yield in minor units when pool is earning. */
 	estYield: number;
-	/** True when pool has a withdrawable share (closed groups). */
 	poolShareReady: boolean;
 	members: DetailMember[];
-	/** Peers with netVsYou === 0 (hidden until "Show settled"). */
 	settledCount: number;
 }
 

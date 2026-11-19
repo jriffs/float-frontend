@@ -46,24 +46,36 @@ function program(adapter: WalletAdapter): Program {
 	return new Program(idl as Idl, provider);
 }
 
-async function send(adapter: WalletAdapter, tx: Transaction): Promise<TransactionSignature> {
+async function send(
+	adapter: WalletAdapter,
+	tx: Transaction,
+	label = 'send'
+): Promise<TransactionSignature> {
 	const conn = connection();
 	const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
 	tx.recentBlockhash = blockhash;
 	tx.feePayer = adapter.publicKey!;
+
+	console.info(`[float:rpc] ${label} signing…`, {
+		feePayer: adapter.publicKey?.toBase58(),
+		ixCount: tx.instructions.length
+	});
+
 	const signed = await adapter.signTransaction(tx);
 	try {
 		const sig = await conn.sendRawTransaction(signed.serialize(), {
 			skipPreflight: false,
 			preflightCommitment: 'confirmed'
 		});
+		console.info(`[float:rpc] ${label} submitted`, sig);
 		await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
+		console.info(`[float:rpc] ${label} confirmed`, sig);
 		return sig;
 	} catch (e) {
-		throw mapProgramError(e);
+		// Prefer simulation logs when web3 attaches them
+		throw mapProgramError(e, label);
 	}
 }
-
 // ---- reads ----
 
 export async function fetchGroup(group: PublicKey): Promise<GroupAccount | null> {
@@ -151,7 +163,7 @@ export async function createGroup(params: CreateGroupParams): Promise<{
 		const sig = await send(adapter, new Transaction().add(ix));
 		return { signature: sig, group };
 	} catch (e) {
-		throw mapProgramError(e);
+		throw mapProgramError(e, 'createGroup');
 	}
 }
 
@@ -187,7 +199,7 @@ export async function joinGroup(params: JoinGroupParams): Promise<{
 		const sig = await send(adapter, new Transaction().add(ix));
 		return { signature: sig, group };
 	} catch (e) {
-		throw mapProgramError(e);
+		throw mapProgramError(e, 'joinGroup');
 	}
 }
 
@@ -195,15 +207,16 @@ export interface LogExpenseParams {
 	adapter: WalletAdapter;
 	creator: PublicKey;
 	groupName: string;
-	/** Total in minor units (USDC 6dp). */
 	amount: number;
 	description: string;
 	/**
-	 * Parallel arrays: participant wallets + share minor units.
-	 * Shares MUST sum to `amount`. Include the payer.
-	 * Remaining accounts = MemberBalance PDAs in this same order.
+	 * Members included in the expense.
+	 * - Equal split: pass everyone (including payer); shares are ignored when equalSplit is true.
+	 * - Custom: payer + others with shareMinor; sum must equal amount.
 	 */
 	participants: { wallet: PublicKey; share: number }[];
+	/** When true (default), on-chain equal split; remaining = others only, shares = []. */
+	equalSplit?: boolean;
 }
 
 export async function logExpense(params: LogExpenseParams): Promise<{
@@ -215,17 +228,42 @@ export async function logExpense(params: LogExpenseParams): Promise<{
 	const payer = adapter.publicKey!;
 	const group = groupPda(creator, groupName);
 	const g = await fetchGroup(group);
-	if (!g) throw mapProgramError(new Error('Group not found'));
+	if (!g) throw mapProgramError(new Error('Group not found'), 'logExpense');
 
 	const expenseIndex = g.expenseCount;
 	const expense = expensePda(group, expenseIndex);
 	const payerBalance = memberBalancePda(group, payer);
-	const shares = participants.map((p) => new BN(p.share));
-	const remaining = participants.map((p) => ({
+
+	// Program does equal split when shares is empty.
+	// remaining_accounts = OTHER members only (never the payer).
+	const others = participants.filter((p) => !p.wallet.equals(payer));
+	const remaining = others.map((p) => ({
 		pubkey: memberBalancePda(group, p.wallet),
 		isWritable: true,
 		isSigner: false
 	}));
+
+	// Optional: still allow custom split later via non-empty shares
+	const useProgramEqualSplit = participants.every((p) => p.share === 0) || params.equalSplit === true;
+
+	let shares: BN[];
+	if (useProgramEqualSplit) {
+		shares = []; // handler: base = amount / n, remainder → payer
+	} else {
+		const payerPart = participants.find((p) => p.wallet.equals(payer));
+		if (!payerPart) {
+			throw mapProgramError(new Error('Payer must be in participants'), 'logExpense');
+		}
+		const ordered = [payerPart, ...others];
+		const sum = ordered.reduce((s, p) => s + p.share, 0);
+		if (sum !== amount) {
+			throw mapProgramError(
+				new Error(`Share sum ${sum} !== amount ${amount}`),
+				'logExpense'
+			);
+		}
+		shares = ordered.map((p) => new BN(p.share));
+	}
 
 	const prog = program(adapter);
 	try {
@@ -242,10 +280,10 @@ export async function logExpense(params: LogExpenseParams): Promise<{
 			.remainingAccounts(remaining)
 			.instruction();
 
-		const sig = await send(adapter, new Transaction().add(ix));
+		const sig = await send(adapter, new Transaction().add(ix), 'logExpense');
 		return { signature: sig, expenseIndex, group };
 	} catch (e) {
-		throw mapProgramError(e);
+		throw mapProgramError(e, 'logExpense');
 	}
 }
 
@@ -306,7 +344,7 @@ export async function settle(params: SettleParams): Promise<{
 		const sig = await send(adapter, tx);
 		return { signature: sig };
 	} catch (e) {
-		throw mapProgramError(e);
+		throw mapProgramError(e, 'settle');
 	}
 }
 

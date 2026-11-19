@@ -48,8 +48,12 @@
 	});
 
 	async function reload() {
+		if (!wallet.address) {
+			await goto(resolve("/"), { replaceState: true });
+			return;
+		}
 		LoadState = { status: "loading" };
-		LoadState = await loadGroupDetail(pubkey);
+		LoadState = await loadGroupDetail(pubkey, wallet.address);
 	}
 
 	function back() {

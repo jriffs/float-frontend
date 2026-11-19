@@ -1,128 +1,121 @@
 /**
- * Group detail loader. Mock-only until chain + expense meta are wired.
- * Demo variants via pubkey substring (case-insensitive):
- *   empty | settled | closed | fail | meta
+ * Group detail loader — chain balances (no pool / history yet).
  */
 
-import type { DetailLoadState, GroupDetail } from './types';
+import { PublicKey } from '@solana/web3.js';
+import { fetchGroup, fetchGroupMembers } from '#lib/program/client.ts';
+import { GROUP_STATUS } from '#lib/program/constants.ts';
+import { getProfiles, shortAddress } from '#lib/supabase/profiles.ts';
+import type { DetailLoadState, DetailMember, GroupDetail } from './types';
 
-function sleep(ms: number): Promise<void> {
-	return new Promise((r) => setTimeout(r, ms));
+/** Bilateral settle suggestion from two group-net balances. */
+function netVsYou(myBal: number, peerBal: number): number {
+	if (myBal > 0 && peerBal < 0) return Math.min(myBal, -peerBal);
+	if (myBal < 0 && peerBal > 0) return -Math.min(-myBal, peerBal);
+	return 0;
 }
 
-function capeTown(pubkey: string): GroupDetail {
-	return {
-		pubkey,
-		name: 'Cape Town 2026',
-		memberCount: 5,
-		status: 'active',
-		myBalance: 42_500_000,
-		owedToYou: 49_000_000,
-		youOwe: 6_500_000,
-		poolEnabled: true,
-		poolEarning: true,
-		estYield: 3_217,
-		poolShareReady: false,
-		members: [
-			{ wallet: 'Kofi2222', displayName: 'Kofi', netVsYou: 18_000_000 },
-			{ wallet: 'Lena3333', displayName: 'Lena', netVsYou: 31_000_000 },
-			{ wallet: 'Dev44444', displayName: 'Dev', netVsYou: -6_500_000 },
-			{ wallet: 'Amara111', displayName: 'Amara', netVsYou: 0 }
-		],
-		settledCount: 1
-	};
-}
+export async function loadGroupDetail(
+	pubkey: string,
+	myWallet: string
+): Promise<DetailLoadState> {
+	if (!pubkey || !myWallet) {
+		return { status: 'error', message: 'Missing group or wallet.' };
+	}
 
-function emptyGroup(pubkey: string): GroupDetail {
-	return {
-		pubkey,
-		name: 'Cape Town 2026',
-		memberCount: 1,
-		status: 'active',
-		myBalance: 0,
-		owedToYou: 0,
-		youOwe: 0,
-		poolEnabled: false,
-		poolEarning: false,
-		estYield: 0,
-		poolShareReady: false,
-		members: [],
-		settledCount: 0
-	};
-}
+	let groupPk: PublicKey;
+	try {
+		groupPk = new PublicKey(pubkey);
+	} catch {
+		return { status: 'error', message: 'Invalid group address.' };
+	}
 
-function settledGroup(pubkey: string): GroupDetail {
-	return {
-		pubkey,
-		name: 'Weekend Hike',
-		memberCount: 4,
-		status: 'active',
-		myBalance: 0,
-		owedToYou: 0,
-		youOwe: 0,
-		poolEnabled: false,
-		poolEarning: false,
-		estYield: 0,
-		poolShareReady: false,
-		members: [
-			{ wallet: 'Dee77777', displayName: 'Dee', netVsYou: 0 },
-			{ wallet: 'Efe88888', displayName: 'Efe', netVsYou: 0 },
-			{ wallet: 'Fola9999', displayName: 'Fola', netVsYou: 0 }
-		],
-		settledCount: 3
-	};
-}
+	try {
+		const [group, members] = await Promise.all([
+			fetchGroup(groupPk),
+			fetchGroupMembers(groupPk)
+		]);
 
-function closedGroup(pubkey: string): GroupDetail {
-	return {
-		pubkey,
-		name: 'Cape Town 2026',
-		memberCount: 5,
-		status: 'closed',
-		myBalance: 11_500_000,
-		owedToYou: 18_000_000,
-		youOwe: 6_500_000,
-		poolEnabled: true,
-		poolEarning: false,
-		estYield: 0,
-		poolShareReady: true,
-		members: [
-			{ wallet: 'Kofi2222', displayName: 'Kofi', netVsYou: 18_000_000 },
-			{ wallet: 'Dev44444', displayName: 'Dev', netVsYou: -6_500_000 }
-		],
-		settledCount: 0
-	};
-}
+		if (!group) {
+			return {
+				status: 'error',
+				message: 'Group not found on-chain. It may have been closed or the address is wrong.'
+			};
+		}
 
-function pickMock(pubkey: string): GroupDetail {
-	const key = pubkey.toLowerCase();
-	if (key.includes('empty')) return emptyGroup(pubkey);
-	if (key.includes('settled') || key.includes('weekend')) return settledGroup(pubkey);
-	if (key.includes('closed')) return closedGroup(pubkey);
-	return capeTown(pubkey);
-}
+		const me = members.find((m) => m.member.toBase58() === myWallet);
+		if (!me) {
+			return {
+				status: 'error',
+				message: 'You are not a member of this group.'
+			};
+		}
 
-export async function loadGroupDetail(pubkey: string): Promise<DetailLoadState> {
-	await sleep(500);
+		const wallets = members.map((m) => m.member.toBase58());
+		let profileMap = new Map<string, { display_name: string }>();
+		try {
+			profileMap = await getProfiles(wallets);
+		} catch {
+			/* profiles optional */
+		}
 
-	const key = pubkey.toLowerCase();
-	if (key.includes('fail')) {
+		const myBal = me.balance;
+		const peers: DetailMember[] = [];
+
+		for (const m of members) {
+			const w = m.member.toBase58();
+			if (w === myWallet) continue;
+
+			const vs = netVsYou(myBal, m.balance);
+			const profile = profileMap.get(w);
+			peers.push({
+				wallet: w,
+				displayName: profile?.display_name ?? shortAddress(w),
+				netVsYou: vs
+			});
+		}
+
+		// Open balances first (largest |net|), then settled
+		peers.sort((a, b) => {
+			const open = Number(b.netVsYou !== 0) - Number(a.netVsYou !== 0);
+			if (open !== 0) return open;
+			return Math.abs(b.netVsYou) - Math.abs(a.netVsYou);
+		});
+
+		let owedToYou = 0;
+		let youOwe = 0;
+		let settledCount = 0;
+		for (const p of peers) {
+			if (p.netVsYou > 0) owedToYou += p.netVsYou;
+			else if (p.netVsYou < 0) youOwe += -p.netVsYou;
+			else settledCount += 1;
+		}
+
+		const detail: GroupDetail = {
+			pubkey: group.pubkey.toBase58(),
+			creator: group.creator.toBase58(),
+			name: group.name,
+			memberCount: group.memberCount,
+			status: group.status === GROUP_STATUS.Closed ? 'closed' : 'active',
+			myBalance: myBal,
+			owedToYou,
+			youOwe,
+			poolEnabled: group.poolEnabled,
+			poolEarning: group.poolEnabled, // until Pool PDA is read
+			estYield: 0,
+			poolShareReady: false,
+			members: peers,
+			settledCount
+		};
+
+		return { status: 'ready', detail };
+	} catch (e) {
 		return {
 			status: 'error',
-			message: 'We could not reach the network. Your balances are safe on-chain.'
-		};
-	}
-
-	const detail = pickMock(pubkey);
-
-	if (key.includes('meta')) {
-		return {
-			status: 'meta-degraded',
-			detail,
 			message:
-				'Balances come straight from the chain, so they are right. Notes, categories and receipts will appear when we reconnect.'
+				e instanceof Error
+					? e.message
+					: 'We could not reach the network. Your balances are safe on-chain.'
 		};
 	}
-
-	return { status: 'ready', detail };
 }

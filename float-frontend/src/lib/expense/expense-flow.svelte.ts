@@ -1,9 +1,14 @@
 // src/lib/expense/expense-flow.svelte.ts
-// Screen 7 state machine: amount → split → review → pending → done | error
-// UI-complete mock: timed wallet approve; no on-chain client yet.
+// amount → split → review → pending → done | error
 
+import { PublicKey } from '@solana/web3.js';
+import type { BaseMessageSignerWalletAdapter } from '@solana/wallet-adapter-base';
 import type { ExpenseCategory } from '#lib/supabase/core.ts';
 import { EXPENSE_CATEGORIES } from '#lib/supabase/core.ts';
+import { logExpense } from '#lib/program/client.ts';
+import { mapProgramError } from '#lib/program/errors.ts';
+import { createExpenseMeta } from '#lib/supabase/expenseMeta.ts';
+import { shortAddress } from '#lib/supabase/profiles.ts';
 
 export type ExpenseStep =
 	| 'amount'
@@ -30,28 +35,16 @@ export type ExpenseErrorReason =
 export interface ExpenseParticipant {
 	wallet: string;
 	displayName: string;
-	/** True for the signed-in payer in this mock. */
 	isYou?: boolean;
 	/** Custom share in USDC minor units (6 decimals). */
 	shareMinor: number;
 }
 
-export interface ExpenseDraft {
-	groupPubkey: string;
-	groupName: string;
-	/** Total in minor units. */
-	amountMinor: number;
-	description: string;
-	category: ExpenseCategory | null;
-	splitMode: SplitMode;
-	participants: ExpenseParticipant[];
-	note: string;
-	receiptFile: File | null;
-}
-
 const USDC_SCALE = 1_000_000;
 const NOTE_MAX = 280;
 const MAX_PARTICIPANTS = 10;
+/** On-chain description is a fixed 64-byte field. */
+const DESC_MAX = 64;
 
 export function majorToMinor(major: number): number {
 	return Math.round(major * USDC_SCALE);
@@ -79,36 +72,7 @@ export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 	other: 'Other'
 };
 
-export { EXPENSE_CATEGORIES, NOTE_MAX, MAX_PARTICIPANTS };
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-	return new Promise((resolve, reject) => {
-		if (signal?.aborted) {
-			reject(new DOMException('Aborted', 'AbortError'));
-			return;
-		}
-		const t = setTimeout(resolve, ms);
-		signal?.addEventListener(
-			'abort',
-			() => {
-				clearTimeout(t);
-				reject(new DOMException('Aborted', 'AbortError'));
-			},
-			{ once: true }
-		);
-	});
-}
-
-/** Demo members for Cape Town–style groups. */
-function defaultParticipants(myWallet: string): ExpenseParticipant[] {
-	return [
-		{ wallet: myWallet, displayName: 'You', isYou: true, shareMinor: 0 },
-		{ wallet: 'Kofi2222', displayName: 'Kofi', shareMinor: 0 },
-		{ wallet: 'Lena3333', displayName: 'Lena', shareMinor: 0 },
-		{ wallet: 'Dev44444', displayName: 'Dev', shareMinor: 0 },
-		{ wallet: 'Tunde555', displayName: 'Tunde', shareMinor: 0 }
-	];
-}
+export { EXPENSE_CATEGORIES, NOTE_MAX, MAX_PARTICIPANTS, DESC_MAX };
 
 export class ExpenseFlow {
 	step = $state<ExpenseStep>('amount');
@@ -117,9 +81,10 @@ export class ExpenseFlow {
 	busy = $state(false);
 
 	groupPubkey = $state('');
-	groupName = $state('Cape Town 2026');
+	groupName = $state('');
+	/** Group creator base58 — required by log_expense. */
+	creator = $state('');
 
-	/** Raw major-unit string from the amount input, e.g. "84" or "84.00". */
 	amountInput = $state('');
 	description = $state('');
 	category = $state<ExpenseCategory | null>(null);
@@ -131,18 +96,45 @@ export class ExpenseFlow {
 	receiptFile = $state<File | null>(null);
 	receiptName = $state<string | null>(null);
 
-	/** Set after successful mock record. */
 	resultOwedToYou = $state(0);
+	/** On-chain expense index after success (for meta). */
+	expenseIndex = $state<number | null>(null);
 
-	#abort: AbortController | null = null;
+	adapter: BaseMessageSignerWalletAdapter | null = null;
+
 	#myWallet = '';
 
-	init(opts: { groupPubkey: string; groupName?: string; myWallet: string }): void {
+	init(opts: {
+		groupPubkey: string;
+		groupName: string;
+		creator: string;
+		myWallet: string;
+		/** Real group members (include you). */
+		members: { wallet: string; displayName: string }[];
+	}): void {
 		this.groupPubkey = opts.groupPubkey;
-		this.groupName = opts.groupName ?? 'Cape Town 2026';
+		this.groupName = opts.groupName;
+		this.creator = opts.creator;
 		this.#myWallet = opts.myWallet;
-		this.participants = defaultParticipants(opts.myWallet);
+
+		const list = opts.members.length
+			? opts.members
+			: [{ wallet: opts.myWallet, displayName: 'You' }];
+
+		this.participants = list.map((m) => ({
+			wallet: m.wallet,
+			displayName: m.wallet === opts.myWallet ? 'You' : m.displayName || shortAddress(m.wallet),
+			isYou: m.wallet === opts.myWallet,
+			shareMinor: 0
+		}));
+
+		// Ensure payer is first-ish for remainder on equal split
+		this.participants.sort((a, b) => Number(!!b.isYou) - Number(!!a.isYou));
 		this.applyEqualShares();
+	}
+
+	setAdapter(a: BaseMessageSignerWalletAdapter | null) {
+		this.adapter = a;
 	}
 
 	get amountMinor(): number {
@@ -152,7 +144,8 @@ export class ExpenseFlow {
 	}
 
 	get amountValid(): boolean {
-		return this.amountMinor > 0 && this.description.trim().length > 0;
+		const d = this.description.trim();
+		return this.amountMinor > 0 && d.length > 0 && d.length <= DESC_MAX;
 	}
 
 	get noteCount(): number {
@@ -163,7 +156,6 @@ export class ExpenseFlow {
 		return this.note.length > NOTE_MAX;
 	}
 
-	/** Sum of custom shares. */
 	get assignedMinor(): number {
 		return this.participants.reduce((s, p) => s + p.shareMinor, 0);
 	}
@@ -181,7 +173,7 @@ export class ExpenseFlow {
 	}
 
 	get canGoReview(): boolean {
-		if (this.splitMode === 'equal') return this.amountMinor > 0 && this.participants.length >= 2;
+		if (this.splitMode === 'equal') return this.amountMinor > 0 && this.participants.length >= 1;
 		return this.customBalanced && this.participants.some((p) => p.shareMinor > 0);
 	}
 
@@ -189,11 +181,10 @@ export class ExpenseFlow {
 		return this.canGoReview && !this.noteOver && !this.busy;
 	}
 
-	/** Equal share per person; remainder cents go to payer (you). */
 	applyEqualShares(): void {
 		const n = this.participants.length;
 		if (n === 0 || this.amountMinor <= 0) {
-			for (const p of this.participants) p.shareMinor = 0;
+			this.participants = this.participants.map((p) => ({ ...p, shareMinor: 0 }));
 			return;
 		}
 		const base = Math.floor(this.amountMinor / n);
@@ -206,7 +197,6 @@ export class ExpenseFlow {
 			}
 			return { ...p, shareMinor: share };
 		});
-		// If payer wasn't found, dump remainder on first
 		if (remainder > 0 && this.participants[0]) {
 			this.participants[0] = {
 				...this.participants[0],
@@ -228,7 +218,6 @@ export class ExpenseFlow {
 		);
 	}
 
-	/** Net effect for payer: total − your share (what others owe you). */
 	get youAreOwed(): number {
 		const you = this.participants.find((p) => p.isYou);
 		const yourShare = you?.shareMinor ?? 0;
@@ -263,63 +252,92 @@ export class ExpenseFlow {
 	async submit(): Promise<void> {
 		if (!this.canSubmit) return;
 
-		const desc = this.description.trim().toLowerCase();
-		// Demo error hooks via description keywords
-		if (desc === 'nosol') {
-			this.errorReason = 'no-sol';
-			this.step = 'error';
-			return;
-		}
-		if (desc === 'fail') {
+		const ad = this.adapter;
+		if (!ad?.publicKey) {
 			this.errorReason = 'network';
 			this.step = 'error';
 			return;
 		}
 
-		this.#abort?.abort();
-		this.#abort = new AbortController();
-		const { signal } = this.#abort;
+		if (this.splitMode === 'equal') this.applyEqualShares();
+
+		const participants = this.participants
+			.filter((p) => p.shareMinor > 0)
+			.map((p) => ({
+				wallet: new PublicKey(p.wallet),
+				share: p.shareMinor
+			}));
+
+		if (participants.length === 0) {
+			this.errorReason = 'network';
+			this.step = 'error';
+			return;
+		}
 
 		this.busy = true;
 		this.errorReason = null;
 		this.pendingPhase = 'details';
 		this.step = 'pending';
+		this.expenseIndex = null;
 
 		try {
-			await sleep(400, signal);
 			this.pendingPhase = 'approve';
-			await sleep(1200, signal);
-			this.pendingPhase = 'recording';
-			await sleep(900, signal);
-			this.pendingPhase = 'meta';
-			await sleep(500, signal);
 
-			if (desc === 'meta') {
-				this.resultOwedToYou = this.youAreOwed;
-				this.errorReason = 'meta-pending';
-				this.step = 'error';
-				return;
+			const memberWallets = this.participants.map((p) => ({
+				wallet: new PublicKey(p.wallet),
+				// ignored when equalSplit: true
+				share: this.splitMode === 'equal' ? 0 : p.shareMinor
+			}));
+
+			const { expenseIndex } = await logExpense({
+				adapter: ad,
+				creator: new PublicKey(this.creator),
+				groupName: this.groupName,
+				amount: this.amountMinor,
+				description: this.description.trim().slice(0, DESC_MAX),
+				participants: memberWallets,
+				equalSplit: this.splitMode === 'equal'
+			});
+
+			this.expenseIndex = expenseIndex;
+			this.pendingPhase = 'recording';
+			this.resultOwedToYou = this.youAreOwed;
+
+			// Off-chain meta is best-effort
+			this.pendingPhase = 'meta';
+			if (this.category) {
+				try {
+					await createExpenseMeta(this.groupPubkey, expenseIndex, {
+						category: this.category,
+						note: this.note.trim() || null,
+						receipt: this.receiptFile
+					});
+				} catch {
+					this.errorReason = 'meta-pending';
+					this.step = 'error';
+					return;
+				}
 			}
 
-			this.resultOwedToYou = this.youAreOwed;
 			this.step = 'done';
 		} catch (e) {
-			if (e instanceof DOMException && e.name === 'AbortError') {
+			const err = mapProgramError(e);
+			const msg = err.message.toLowerCase();
+			if (msg.includes('declined') || msg.includes('reject')) {
 				this.errorReason = 'declined';
-				this.step = 'error';
+			} else if (msg.includes('sol') || msg.includes('insufficient')) {
+				this.errorReason = 'no-sol';
 			} else {
 				this.errorReason = 'network';
-				this.step = 'error';
 			}
+			this.step = 'error';
 		} finally {
 			this.busy = false;
-			this.#abort = null;
 		}
 	}
 
 	cancelPending(): void {
-		this.#abort?.abort();
-		this.#abort = null;
+		// Wallet prompt can't be cancelled from our side mid-sign; after decline mapProgramError handles it.
 		this.busy = false;
 		this.errorReason = 'declined';
 		this.step = 'error';
@@ -331,14 +349,11 @@ export class ExpenseFlow {
 	}
 
 	backToReview(): void {
-		this.#abort?.abort();
-		this.#abort = null;
 		this.busy = false;
 		this.errorReason = null;
 		this.step = 'review';
 	}
 
-	/** After meta-pending, treat as done. */
 	finishDespiteMeta(): void {
 		this.errorReason = null;
 		this.step = 'done';
@@ -353,8 +368,10 @@ export class ExpenseFlow {
 		this.receiptFile = null;
 		this.receiptName = null;
 		this.resultOwedToYou = 0;
+		this.expenseIndex = null;
 		this.errorReason = null;
-		this.participants = defaultParticipants(this.#myWallet);
+		this.participants = this.participants.map((p) => ({ ...p, shareMinor: 0 }));
+		this.applyEqualShares();
 		this.step = 'amount';
 	}
 }
