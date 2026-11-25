@@ -15,10 +15,18 @@ import { Program, AnchorProvider, BN, type Idl } from '@coral-xyz/anchor';
 import type { BaseMessageSignerWalletAdapter } from '@solana/wallet-adapter-base';
 import idl from './idl/float.json';
 import { FLOAT_PROGRAM_ID, USDC_MINT, RPC_URL } from './constants.ts';
-import { groupPda, memberBalancePda, expensePda } from './pdas.ts';
-import { decodeGroup, decodeMemberBalance, decodeExpense } from './decode.ts';
-import type { GroupAccount, MemberBalanceAccount, ExpenseAccount } from './types.ts';
+import { groupPda, memberBalancePda, expensePda, poolPda } from './pdas.ts';
+import { decodeGroup, decodeMemberBalance, decodeExpense, decodePool } from './decode.ts';
+import type { GroupAccount, MemberBalanceAccount, ExpenseAccount, PoolAccount } from './types.ts';
 import { mapProgramError } from './errors.ts';
+import {
+	DEVNET_KAMINO_VAULT_ADDRESS,
+	resolveKaminoAccounts,
+	buildDeployToKaminoAccounts,
+	buildRecallFromKaminoAccounts,
+	createPoolSharesAtaIx,
+	type FloatKaminoContext
+} from './kamino.ts';
 
 export type WalletAdapter = BaseMessageSignerWalletAdapter;
 
@@ -126,6 +134,28 @@ export async function fetchExpense(
 	const info = await connection().getAccountInfo(pda);
 	if (!info) return null;
 	return decodeExpense(pda, Buffer.from(info.data));
+}
+
+/** Fetch all expenses for a group (indices 0 .. expenseCount-1). */
+export async function fetchGroupExpenses(
+	group: PublicKey,
+	expenseCount: number
+): Promise<ExpenseAccount[]> {
+	if (expenseCount <= 0) return [];
+
+	const conn = connection();
+	const pdas = Array.from({ length: expenseCount }, (_, i) => expensePda(group, i));
+	const infos = await conn.getMultipleAccountsInfo(pdas);
+
+	const out: ExpenseAccount[] = [];
+	for (let i = 0; i < infos.length; i++) {
+		const info = infos[i];
+		if (!info) continue;
+		out.push(decodeExpense(pdas[i]!, Buffer.from(info.data)));
+	}
+	// newest first
+	out.sort((a, b) => b.expenseIndex - a.expenseIndex);
+	return out;
 }
 
 // ---- writes (bill split) ----
@@ -348,4 +378,294 @@ export async function settle(params: SettleParams): Promise<{
 	}
 }
 
-export { connection, groupPda, memberBalancePda, expensePda, FLOAT_PROGRAM_ID, USDC_MINT };
+export async function fetchPool(group: PublicKey): Promise<PoolAccount | null> {
+	const pda = poolPda(group);
+	const info = await connection().getAccountInfo(pda);
+	if (!info) return null;
+	return decodePool(pda, Buffer.from(info.data));
+}
+
+export interface EnablePoolParams {
+	adapter: WalletAdapter;
+	groupName: string;
+}
+
+/** Creator only — initializes Pool PDA, sets group.pool_enabled. */
+export async function enablePool(params: EnablePoolParams): Promise<{
+	signature: TransactionSignature;
+	pool: PublicKey;
+}> {
+	const { adapter, groupName } = params;
+	const creator = adapter.publicKey!;
+	const group = groupPda(creator, groupName);
+	const pool = poolPda(group);
+	const prog = program(adapter);
+
+	try {
+		const ix = await prog.methods
+			.enablePool(groupName)
+			.accounts({
+				creator,
+				group,
+				pool,
+				systemProgram: SystemProgram.programId
+			})
+			.instruction();
+
+		const sig = await send(adapter, new Transaction().add(ix), 'enablePool');
+		return { signature: sig, pool };
+	} catch (e) {
+		throw mapProgramError(e, 'enablePool');
+	}
+}
+
+export interface DepositParams {
+	adapter: WalletAdapter;
+	creator: PublicKey;
+	groupName: string;
+	/** USDC minor units */
+	amount: number;
+}
+
+export async function depositToPool(params: DepositParams): Promise<{
+	signature: TransactionSignature;
+}> {
+	const { adapter, creator, groupName, amount } = params;
+	const depositor = adapter.publicKey!;
+	const group = groupPda(creator, groupName);
+	const g = await fetchGroup(group);
+	if (!g) throw mapProgramError(new Error('Group not found'), 'deposit');
+	if (!g.poolEnabled) throw mapProgramError(new Error('Pool is not enabled'), 'deposit');
+
+	const pool = poolPda(group);
+	const memberBalance = memberBalancePda(group, depositor);
+	const mint = g.settlementMint;
+	const depositorAta = getAssociatedTokenAddressSync(mint, depositor);
+	const poolAta = getAssociatedTokenAddressSync(mint, pool, true); // allowOwnerOffCurve
+
+	const tx = new Transaction().add(
+		createAssociatedTokenAccountIdempotentInstruction(depositor, depositorAta, depositor, mint),
+		createAssociatedTokenAccountIdempotentInstruction(depositor, poolAta, pool, mint)
+	);
+
+	const prog = program(adapter);
+	try {
+		const ix = await prog.methods
+			.deposit(groupName, new BN(amount))
+			.accounts({
+				depositor,
+				creator,
+				group,
+				pool,
+				memberBalance,
+				settlementMint: mint,
+				depositorTokenAccount: depositorAta,
+				poolTokenAccount: poolAta,
+				tokenProgram: TOKEN_PROGRAM_ID,
+				associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+				systemProgram: SystemProgram.programId
+			})
+			.instruction();
+
+		tx.add(ix);
+		const sig = await send(adapter, tx, 'deposit');
+		return { signature: sig };
+	} catch (e) {
+		throw mapProgramError(e, 'deposit');
+	}
+}
+
+export interface WithdrawParams {
+	adapter: WalletAdapter;
+	creator: PublicKey;
+	groupName: string;
+}
+
+/** Only when group is closed and pool is not deployed. */
+export async function withdrawFromPool(params: WithdrawParams): Promise<{
+	signature: TransactionSignature;
+}> {
+	const { adapter, creator, groupName } = params;
+	const member = adapter.publicKey!;
+	const group = groupPda(creator, groupName);
+	const g = await fetchGroup(group);
+	if (!g) throw mapProgramError(new Error('Group not found'), 'withdraw');
+
+	const pool = poolPda(group);
+	const memberBalance = memberBalancePda(group, member);
+	const mint = g.settlementMint;
+	const memberAta = getAssociatedTokenAddressSync(mint, member);
+	const poolAta = getAssociatedTokenAddressSync(mint, pool, true);
+
+	const tx = new Transaction().add(
+		createAssociatedTokenAccountIdempotentInstruction(member, memberAta, member, mint)
+	);
+
+	const prog = program(adapter);
+	try {
+		const ix = await prog.methods
+			.withdraw(groupName)
+			.accounts({
+				member,
+				creator,
+				group,
+				pool,
+				memberBalance,
+				settlementMint: mint,
+				poolTokenAccount: poolAta,
+				memberTokenAccount: memberAta,
+				tokenProgram: TOKEN_PROGRAM_ID,
+				associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+				systemProgram: SystemProgram.programId
+			})
+			.instruction();
+
+		tx.add(ix);
+		const sig = await send(adapter, tx, 'withdraw');
+		return { signature: sig };
+	} catch (e) {
+		throw mapProgramError(e, 'withdraw');
+	}
+}
+
+async function kaminoCtx(params: {
+	adapter: WalletAdapter;
+	creator: PublicKey;
+	groupName: string;
+	vaultAddress?: string;
+}): Promise<FloatKaminoContext & { group: GroupAccount }> {
+	const { adapter, creator, groupName } = params;
+	const groupPk = groupPda(creator, groupName);
+	const group = await fetchGroup(groupPk);
+	if (!group) throw mapProgramError(new Error('Group not found'), 'kamino');
+	if (!group.poolEnabled) {
+		throw mapProgramError(new Error('Pool is not enabled'), 'kamino');
+	}
+
+	const pool = poolPda(groupPk);
+	const vaultAddress = params.vaultAddress ?? DEVNET_KAMINO_VAULT_ADDRESS;
+
+	const resolved = await resolveKaminoAccounts({
+		vaultAddress,
+		poolPda: pool.toBase58(),
+		creator: creator.toBase58(),
+		settlementMint: group.settlementMint.toBase58(),
+		rpcUrl: RPC_URL
+	});
+
+	return {
+		program: program(adapter),
+		groupName,
+		creator: adapter.publicKey!, // signer
+		creatorAuthority: creator, // group seed authority
+		groupPda: groupPk,
+		poolPda: pool,
+		settlementMint: group.settlementMint,
+		resolved,
+		group
+	};
+}
+
+export async function deployToKamino(params: {
+	adapter: WalletAdapter;
+	creator: PublicKey;
+	groupName: string;
+	vaultAddress?: string;
+}): Promise<{ signature: TransactionSignature }> {
+	const { adapter } = params;
+	if (!adapter.publicKey?.equals(params.creator)) {
+		throw mapProgramError(new Error('Only the group creator can deploy'), 'deployToKamino');
+	}
+
+	try {
+		const ctx = await kaminoCtx(params);
+		const { accounts, remainingAccounts } = buildDeployToKaminoAccounts(ctx);
+
+		const createAtaIx = createPoolSharesAtaIx({
+			payer: adapter.publicKey!,
+			poolPda: ctx.poolPda,
+			sharesMint: accounts.sharesMint as PublicKey,
+			sharesTokenProgram: accounts.sharesTokenProgram as PublicKey | undefined
+		});
+
+		const ix = await ctx.program.methods
+			.deployToKamino(ctx.groupName)
+			.accounts(accounts as any)
+			.remainingAccounts(remainingAccounts)
+			.instruction();
+
+		const sig = await send(
+			adapter,
+			new Transaction().add(createAtaIx, ix),
+			'deployToKamino'
+		);
+		return { signature: sig };
+	} catch (e) {
+		throw mapProgramError(e, 'deployToKamino');
+	}
+}
+
+export async function recallFromKamino(params: {
+	adapter: WalletAdapter;
+	creator: PublicKey;
+	groupName: string;
+	vaultAddress?: string;
+}): Promise<{ signature: TransactionSignature }> {
+	const { adapter } = params;
+	if (!adapter.publicKey?.equals(params.creator)) {
+		throw mapProgramError(new Error('Only the group creator can recall'), 'recallFromKamino');
+	}
+
+	try {
+		const ctx = await kaminoCtx(params);
+		const { accounts, remainingAccounts } = buildRecallFromKaminoAccounts(ctx);
+
+		const ix = await ctx.program.methods
+			.recallFromKamino(ctx.groupName)
+			.accounts(accounts as any)
+			.remainingAccounts(remainingAccounts)
+			.instruction();
+
+		const sig = await send(adapter, new Transaction().add(ix), 'recallFromKamino');
+		return { signature: sig };
+	} catch (e) {
+		throw mapProgramError(e, 'recallFromKamino');
+	}
+}
+
+export async function harvestYield(params: {
+	adapter: WalletAdapter;
+	creator: PublicKey;
+	groupName: string;
+}): Promise<{ signature: TransactionSignature }> {
+	const { adapter, creator, groupName } = params;
+	const groupPk = groupPda(creator, groupName);
+	const g = await fetchGroup(groupPk);
+	if (!g) throw mapProgramError(new Error('Group not found'), 'harvestYield');
+
+	const pool = poolPda(groupPk);
+	const poolAta = getAssociatedTokenAddressSync(g.settlementMint, pool, true);
+	const prog = program(adapter);
+
+	try {
+		const ix = await prog.methods
+			.harvestYield(groupName)
+			.accounts({
+				creator: adapter.publicKey!, // payer if needed
+				creatorAuthority: creator,
+				group: groupPk,
+				pool,
+				settlementMint: g.settlementMint,
+				poolTokenAccount: poolAta,
+				tokenProgram: TOKEN_PROGRAM_ID
+			})
+			.instruction();
+
+		const sig = await send(adapter, new Transaction().add(ix), 'harvestYield');
+		return { signature: sig };
+	} catch (e) {
+		throw mapProgramError(e, 'harvestYield');
+	}
+}
+
+export { connection, groupPda, memberBalancePda, expensePda, poolPda, FLOAT_PROGRAM_ID, USDC_MINT };

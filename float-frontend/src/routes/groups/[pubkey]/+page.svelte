@@ -22,6 +22,19 @@
 	import LoadingView from "#lib/group-detail/LoadingView.svelte";
 	import BalancesTab from "#lib/group-detail/BalancesTab.svelte";
 	import NudgeSheet from "#lib/group-detail/NudgeSheet.svelte";
+	import { loadGroupHistory } from '#lib/group-detail/history.ts';
+	import type { HistoryLoadState } from '#lib/group-detail/types.ts';
+	import HistoryTab from '#lib/group-detail/HistoryTab.svelte';
+	import { loadPoolView, type PoolLoadState } from '#lib/group-detail/pool.ts';
+	import PoolTab from '#lib/group-detail/PoolTab.svelte';
+	import {
+		enablePool,
+		depositToPool,
+		withdrawFromPool
+	} from '#lib/program/client.ts';
+	import { mapProgramError } from '#lib/program/errors.ts';
+	import { PublicKey } from '@solana/web3.js';
+	import { deployToKamino, recallFromKamino, harvestYield } from '#lib/program/client.ts';
 
 	const wallet = getWalletContext();
 	const pubkey = $derived(page.params.pubkey ?? "");
@@ -32,6 +45,13 @@
 
 	let nudgeOpen = $state(false);
 	let nudgePeer = $state<DetailMember | null>(null);
+
+	let historyState = $state<HistoryLoadState>({ status: 'loading' });
+	let historyLoaded = $state(false);
+
+	let poolState = $state<PoolLoadState>({ status: 'loading' });
+	let poolBusy = $state(false);
+	let poolError = $state<string | null>(null);
 
 	const detail = $derived(
 		LoadState.status === "ready" || LoadState.status === "meta-degraded"
@@ -54,6 +74,151 @@
 		}
 		LoadState = { status: "loading" };
 		LoadState = await loadGroupDetail(pubkey, wallet.address);
+	}
+
+	async function loadHistory() {
+		if (!wallet.address) return;
+		historyState = { status: 'loading' };
+		historyState = await loadGroupHistory(pubkey, wallet.address);
+		historyLoaded = true;
+	}
+
+	// Lazy-load when user opens the tab
+	$effect(() => {
+		if (tab === 'history' && wallet.address) {
+			void loadHistory();
+		}
+	});
+
+	async function loadPool() {
+		if (!wallet.address) return;
+		poolState = { status: 'loading' };
+		poolError = null;
+		poolState = await loadPoolView(pubkey, wallet.address);
+	}
+
+	$effect(() => {
+		if (tab === 'pool' && wallet.address) {
+			void loadPool();
+		}
+	});
+
+	async function onEnablePool() {
+		const ad = wallet.getActiveAdapter();
+		const v = poolState.status === 'ready' ? poolState.view : null;
+		if (!ad || !v) return;
+		poolBusy = true;
+		poolError = null;
+		try {
+			await enablePool({ adapter: ad, groupName: v.groupName });
+			await loadPool();
+			await reload(); // refresh group.poolEnabled on balances
+		} catch (e) {
+			poolError = mapProgramError(e).message;
+		} finally {
+			poolBusy = false;
+		}
+	}
+
+	async function onDeposit(major: number) {
+		const ad = wallet.getActiveAdapter();
+		const v = poolState.status === 'ready' ? poolState.view : null;
+		if (!ad || !v) return;
+		poolBusy = true;
+		poolError = null;
+		try {
+			await depositToPool({
+				adapter: ad,
+				creator: new PublicKey(v.creator),
+				groupName: v.groupName,
+				amount: Math.round(major * 1_000_000)
+			});
+			await loadPool();
+		} catch (e) {
+			poolError = mapProgramError(e).message;
+		} finally {
+			poolBusy = false;
+		}
+	}
+
+	async function onWithdraw() {
+		const ad = wallet.getActiveAdapter();
+		const v = poolState.status === 'ready' ? poolState.view : null;
+		if (!ad || !v) return;
+		poolBusy = true;
+		poolError = null;
+		try {
+			await withdrawFromPool({
+				adapter: ad,
+				creator: new PublicKey(v.creator),
+				groupName: v.groupName
+			});
+			await loadPool();
+		} catch (e) {
+			poolError = mapProgramError(e).message;
+		} finally {
+			poolBusy = false;
+		}
+	}
+
+	async function onDeploy() {
+		const ad = wallet.getActiveAdapter();
+		const v = poolState.status === 'ready' ? poolState.view : null;
+		if (!ad || !v) return;
+		poolBusy = true;
+		poolError = null;
+		try {
+			await deployToKamino({
+				adapter: ad,
+				creator: new PublicKey(v.creator),
+				groupName: v.groupName
+			});
+			await loadPool();
+		} catch (e) {
+			poolError = mapProgramError(e).message;
+		} finally {
+			poolBusy = false;
+		}
+	}
+
+	async function onRecall() {
+		const ad = wallet.getActiveAdapter();
+		const v = poolState.status === 'ready' ? poolState.view : null;
+		if (!ad || !v) return;
+		poolBusy = true;
+		poolError = null;
+		try {
+			await recallFromKamino({
+				adapter: ad,
+				creator: new PublicKey(v.creator),
+				groupName: v.groupName
+			});
+			await loadPool();
+		} catch (e) {
+			poolError = mapProgramError(e).message;
+		} finally {
+			poolBusy = false;
+		}
+	}
+
+	async function onHarvest() {
+		const ad = wallet.getActiveAdapter();
+		const v = poolState.status === 'ready' ? poolState.view : null;
+		if (!ad || !v) return;
+		poolBusy = true;
+		poolError = null;
+		try {
+			await harvestYield({
+				adapter: ad,
+				creator: new PublicKey(v.creator),
+				groupName: v.groupName
+			});
+			await loadPool();
+		} catch (e) {
+			poolError = mapProgramError(e).message;
+		} finally {
+			poolBusy = false;
+		}
 	}
 
 	function back() {
@@ -206,34 +371,51 @@
 					onwithdraw={() => toastSoon("Withdraw pool share")}
 				/>
 			</div>
-		{:else if tab === "pool"}
-			<div
-				class="flex flex-1 flex-col items-center justify-center px-8 text-center"
-			>
-				<p class="font-display text-[22px] font-semibold">Pool</p>
-				<p class="mt-2 text-[14px] font-semibold text-mute">
-					Deposit, deploy to Kamino, and withdraw land in a later
-					screen.
-				</p>
-				{#if detail.poolEnabled}
-					<p class="mt-3 text-[13px] font-bold text-amber">
-						Pool is enabled for this group
-					</p>
-				{:else}
-					<p class="mt-3 text-[13px] font-bold text-mute">
-						Pool is off
-					</p>
-				{/if}
-			</div>
-		{:else}
-			<div
-				class="flex flex-1 flex-col items-center justify-center px-8 text-center"
-			>
-				<p class="font-display text-[22px] font-semibold">History</p>
-				<p class="mt-2 text-[14px] font-semibold text-mute">
-					Expenses and settlements feed will live here.
-				</p>
-			</div>
+		{:else if tab === 'pool'}
+			{#if poolState.status === 'loading'}
+				<p class="py-16 text-center text-sm font-bold text-mute">Loading pool…</p>
+			{:else if poolState.status === 'error'}
+				<div class="mx-5 mt-6 rounded-[28px] bg-surface p-[22px]">
+					<StatusCard icon={CircleAlert} title="Could not load pool" body={poolState.message}>
+						{#snippet actions()}
+							<Button onclick={() => void loadPool()}>Try again</Button>
+						{/snippet}
+					</StatusCard>
+				</div>
+			{:else}
+				<PoolTab
+					view={poolState.view}
+					busy={poolBusy}
+					error={poolError}
+					onenable={() => void onEnablePool()}
+					ondeposit={(n) => void onDeposit(n)}
+					onwithdraw={() => void onWithdraw()}
+					ondeploy={() => void onDeploy()}
+					onrecall={() => void onRecall()}
+					onharvest={() => void onHarvest()}
+				/>
+			{/if}
+		{:else if tab === 'history'}
+			{#if historyState.status === 'error'}
+				<div class="mx-5 mt-6 rounded-[28px] bg-surface p-[22px]">
+					<StatusCard
+						icon={CircleAlert}
+						title="Could not load history"
+						body={historyState.message}
+					>
+						{#snippet actions()}
+							<Button onclick={() => void loadHistory()}>Try again</Button>
+						{/snippet}
+					</StatusCard>
+				</div>
+			{:else}
+				<HistoryTab
+					items={historyState.status === 'ready' ? historyState.items : []}
+					metaDegraded={historyState.status === 'ready' && historyState.metaDegraded}
+					loading={historyState.status === 'loading'}
+					onretry={() => void loadHistory()}
+				/>
+			{/if}
 		{/if}
 
 		<BottomNav active="groups" />

@@ -1,3 +1,5 @@
+import type { ExpenseCategory } from '#lib/supabase/core.ts';
+
 /** Group detail (Screen 6) — balances-focused types. */
 
 export type GroupStatus = 'active' | 'closed';
@@ -38,3 +40,28 @@ export type DetailLoadState =
 	| { status: 'ready'; detail: GroupDetail }
 	| { status: 'error'; message: string }
 	| { status: 'meta-degraded'; detail: GroupDetail; message: string };
+
+
+export interface HistoryItem {
+	expenseIndex: number;
+	pubkey: string;
+	payer: string;
+	payerName: string;
+	/** USDC minor units */
+	amount: number;
+	description: string;
+	/** unix seconds */
+	timestamp: number;
+	participantCount: number;
+	paidFromPool: boolean;
+	/** Off-chain meta (may be missing) */
+	category: ExpenseCategory | null;
+	note: string | null;
+	receiptPath: string | null;
+	isYou: boolean;
+}
+
+export type HistoryLoadState =
+	| { status: 'loading' }
+	| { status: 'ready'; items: HistoryItem[]; metaDegraded?: boolean }
+	| { status: 'error'; message: string };

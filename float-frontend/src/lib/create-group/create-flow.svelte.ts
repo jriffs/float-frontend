@@ -4,6 +4,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { createGroup } from '#lib/program/client.ts';
 import { mapProgramError, FloatProgramError } from '#lib/program/errors.ts';
+import { syncMembership } from '#lib/supabase/expenseMeta.ts';
 import type { BaseMessageSignerWalletAdapter } from '@solana/wallet-adapter-base';
 
 export type CreateStep = 'form' | 'pending' | 'invite' | 'error';
@@ -167,6 +168,24 @@ export class CreateFlow {
 
 			this.pendingPhase = 'invite-setup';
 
+			// Mirror membership so RLS allows expense_meta later
+			try {
+				await syncMembership(group.toBase58());
+			} catch (syncErr) {
+				console.error('[float] syncMembership after create', syncErr);
+				// Group exists on-chain; surface setup-incomplete instead of hard-failing create
+				this.created = {
+					pubkey: group.toBase58(),
+					name: this.trimmedName,
+					creator: ad.publicKey.toBase58(),
+					poolEnabled: false,
+					signature
+				};
+				this.errorReason = 'setup-incomplete';
+				this.step = 'error';
+				return;
+			}
+
 			this.created = {
 				pubkey: group.toBase58(),
 				name: this.trimmedName,
@@ -233,13 +252,19 @@ export class CreateFlow {
 		this.step = 'error';
 	}
 
-	retrySetup(): void {
-		// Mock: setup always "succeeds" on retry.
-		if (this.created) {
+	async retrySetup(): Promise<void> {
+		if (!this.created) {
+			this.backToForm();
+			return;
+		}
+		try {
+			await syncMembership(this.created.pubkey);
 			this.errorReason = null;
 			this.step = 'invite';
-		} else {
-			this.backToForm();
+		} catch (e) {
+			console.error('[float] retrySetup', e);
+			this.errorReason = 'setup-incomplete';
+			this.step = 'error';
 		}
 	}
 
@@ -252,7 +277,7 @@ export class CreateFlow {
 		// optional: q.set('g', this.created.pubkey);
 		return `${origin}/groups/join?${q.toString()}`;
 	}
-	
+
 	shortInvitePath(): string {
 		const pk = this.created?.pubkey;
 		if (!pk) return '';

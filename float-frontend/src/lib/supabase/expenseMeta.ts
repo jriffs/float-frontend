@@ -4,6 +4,8 @@ import {
   supabase, compressImage, extFor, getSessionWallet,
   type ExpenseCategory, type ExpenseMeta,
 } from './core';
+import { PublicKey } from '@solana/web3.js';
+import { memberBalancePda } from '#lib/program/pdas.ts';
 
 const RECEIPT_MAX_BYTES = 5 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -16,8 +18,24 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
  * opening a group the mirror does not know about yet.
  */
 export async function syncMembership(group: string): Promise<void> {
-  const { error } = await supabase.functions.invoke('sync-membership', { body: { group } });
-  if (error) throw new Error(`Could not verify group membership: ${error.message}`);
+	const wallet = await getSessionWallet();
+	const memberBalance = memberBalancePda(
+		new PublicKey(group),
+		new PublicKey(wallet)
+	).toBase58();
+
+	const { data, error } = await supabase.functions.invoke('sync-membership', {
+		body: { group, memberBalance }
+	});
+
+	if (error) {
+		console.error('[float] sync-membership', error, data);
+		throw new Error(`Could not verify group membership: ${error.message}`);
+	}
+	if (data && typeof data === 'object' && 'error' in data) {
+		console.error('[float] sync-membership body', data);
+		throw new Error(String((data as { error: string }).error));
+	}
 }
 
 export async function isMirroredMember(group: string): Promise<boolean> {
@@ -57,6 +75,10 @@ export async function createExpenseMeta(
   input: ExpenseMetaInput,
 ): Promise<ExpenseMeta> {
   if (input.note && input.note.length > 280) throw new Error('Note must be 280 characters or fewer.');
+  
+  // Self-heal: write group_members via Edge Function if missing
+	await ensureMembership(group);
+  
   const wallet = await getSessionWallet();
 
   const receiptPath = input.receipt ? await uploadReceipt(group, expenseIndex, input.receipt) : null;

@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
-import type { GroupAccount, MemberBalanceAccount, ExpenseAccount } from './types.ts';
+import type { GroupAccount, MemberBalanceAccount, ExpenseAccount, PoolAccount } from './types.ts';
 
 function readU64(buf: Buffer, off: number): number {
 	// USDC amounts fit in 2^53 for practical balances
@@ -42,6 +42,29 @@ export function decodeGroup(pubkey: PublicKey, data: Buffer): GroupAccount {
 		expenseCount,
 		poolEnabled,
 		status,
+		bump
+	};
+}
+
+export function decodePool(pubkey: PublicKey, data: Buffer): PoolAccount {
+	let o = 8;
+	const group = readPubkey(data, o); o += 32;
+	const totalShares = readU64(data, o); o += 8;
+	const totalValue = readU64(data, o); o += 8;
+	const totalPrincipal = readU64(data, o); o += 8;
+	const kaminoVault = readPubkey(data, o); o += 32;
+	const lastHarvestTs = readI64(data, o); o += 8;
+	const isDeployed = data.readUInt8(o++) === 1;
+	const bump = data.readUInt8(o++);
+	return {
+		pubkey,
+		group,
+		totalShares,
+		totalValue,
+		totalPrincipal,
+		kaminoVault,
+		lastHarvestTs,
+		isDeployed,
 		bump
 	};
 }

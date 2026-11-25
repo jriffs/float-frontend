@@ -73,7 +73,7 @@
 					<Button onclick={() => flow.retry()}>Try again</Button>
 					<Button variant="secondary" onclick={() => flow.backToForm()}>Back to edit</Button>
 				{:else if reason === 'setup-incomplete'}
-					<Button onclick={() => flow.retrySetup()}>Retry setup</Button>
+					<Button onclick={() => void flow.retrySetup()}>Retry setup</Button>
 					{#if flow.created}
 						<Button variant="secondary" onclick={() => ongroup(flow.created!.pubkey)}>
 							Go to group
