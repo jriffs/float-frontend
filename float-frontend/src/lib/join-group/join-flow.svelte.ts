@@ -3,6 +3,7 @@
 // UI-complete mock: no on-chain client; delays simulate wallet approve + join.
 
 import type { BaseMessageSignerWalletAdapter } from "@solana/wallet-adapter-base";
+import { syncMembership } from "#lib/supabase/expenseMeta.ts";
 
 export type JoinStep = 'boot' | 'gate' | 'preview' | 'pending' | 'done' | 'error';
 
@@ -241,6 +242,8 @@ export class JoinFlow {
 				creator: new PublicKey(this.creatorParam),
 				name: this.nameParam
 			});
+
+			await syncMembership(groupPK.toBase58());
 
 			this.pendingPhase = 'joining';
 			this.pendingPhase = 'setup';

@@ -36,3 +36,15 @@ export interface ExpenseAccount {
 	paidFromPool: boolean;
 	bump: number;
 }
+
+export interface PoolAccount {
+	pubkey: PublicKey;
+	group: PublicKey;
+	totalShares: number;
+	totalValue: number;
+	totalPrincipal: number;
+	kaminoVault: PublicKey;
+	lastHarvestTs: number;
+	isDeployed: boolean;
+	bump: number;
+}

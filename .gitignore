@@ -30,3 +30,6 @@ Thumbs.db
 # Vite timestamped config files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# nodejs light backend for kamino accounts discovery
+services/
