@@ -14,8 +14,8 @@
   <tr>
     <td align="center" width="100%">
       <br>
-      <h2>👉 <a href="https://f5fb6200.floatfinance.pages.dev/">TRY THE LIVE DEMO</a> 👈</h2>
-      <p><strong>https://f5fb6200.floatfinance.pages.dev/</strong></p>
+      <h2>👉 <a href="https://034a6c42.floatfinance.pages.dev/">TRY THE LIVE DEMO</a> 👈</h2>
+      <p><strong>https://034a6c42.floatfinance.pages.dev/</strong></p>
       <br>
       <p>⚠️ <strong>The app is still under active development.</strong><br>
       Only the colored steps below are currently implemented.<br>
@@ -80,8 +80,8 @@ Progress is shown as cards. Color = live today. Grey = not yet implemented.
       </div>
     </td>
     <td align="center" width="16%">
-      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
-        <strong>⬜ Join Group</strong><br>
+      <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>✅ Join Group</strong><br>
         <small>Invite link</small>
       </div>
     </td>
@@ -92,14 +92,14 @@ Progress is shown as cards. Color = live today. Grey = not yet implemented.
       </div>
     </td>
     <td align="center" width="16%">
-      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
-        <strong>⬜ View Balances</strong><br>
+      <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>✅ View Balances</strong><br>
         <small>Who owes whom</small>
       </div>
     </td>
     <td align="center" width="16%">
-      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
-        <strong>⬜ Settle</strong><br>
+      <div style="border: 2px solid ✅; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>✅ Settle</strong><br>
         <small>On-chain USDC</small>
       </div>
     </td>
@@ -109,14 +109,14 @@ Progress is shown as cards. Color = live today. Grey = not yet implemented.
 <table>
   <tr>
     <td align="center" width="14%">
-      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
-        <strong>⬜ Enable Pool</strong><br>
+      <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>✅ Enable Pool</strong><br>
         <small>Optional</small>
       </div>
     </td>
     <td align="center" width="14%">
-      <div style="border: 2px solid #d1d5db; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
-        <strong>⬜ Deposit</strong><br>
+      <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 12px; background: #f9fafb; color: #9ca3af;">
+        <strong>✅ Deposit</strong><br>
         <small>USDC → shares</small>
       </div>
     </td>
