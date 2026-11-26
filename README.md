@@ -269,32 +269,6 @@ Once funds have been recalled, the group can apply available pool value to an ex
 
 > **Screenshot note:** These are image slots, not screenshots of the current build. Add genuine captures from the running app at the paths shown above. Do not use mockups that imply a flow is implemented if it is still planned.
 
-### Adding or replacing screenshots
-
-Save the screenshots in `docs/images/` using the filenames referenced above:
-
-```text
-docs/
-  images/
-    bill-splitting-01-create-group.png
-    bill-splitting-02-add-expense.png
-    bill-splitting-03-settle.png
-    yield-pool-01-create-pool.png
-    yield-pool-02-deposit.png
-    yield-pool-03-withdraw.png
-    yield-pool-04-yield-paid-for-coffee.png
-```
-
-For a clean GitHub presentation:
-
-- Capture the actual app UI at a consistent viewport size.
-- Prefer crisp screenshots around 1200 px wide; keep text legible when scaled down.
-- Use the same device frame or no device frame throughout. Avoid mixing styles.
-- Crop browser chrome and unrelated desktop content.
-- Use real transaction results for settlement, deposit, withdrawal, and yield-funded expense states.
-- Blur wallet addresses or personal information that should not be public.
-- Keep captions focused on what the screenshot proves, not just which page it shows.
-
 ## Product experience and information architecture
 
 The planned navigation keeps the app focused:
@@ -489,17 +463,6 @@ A good demo should be clear about what is intentionally simple today and what ne
 - **Make the complex legible.** Pool value, yield, deployment, recall, and withdrawal should be understandable without DeFi expertise.
 - **Show the whole transaction lifecycle.** Pending is not confirmed; a failed transaction must not look successful.
 - **Build for groups, not wallet power users alone.** Profiles and clear language make on-chain coordination feel social and approachable.
-
-## Project status
-
-The supplied product documents define the intended user journey, information architecture, stack, and MVP boundaries. They describe a Devnet target and an end-to-end demonstration goal, but do not provide verified implementation status, live URLs, or deployment details.
-
-Before submission, add:
-- A short demo video or deployed app link.
-- Current screenshots of the Groups, Balances, and Pool experiences.
-- Verified program ID and Devnet explorer links.
-- Exact install / test / build scripts from `package.json`.
-- A concise list of what works in the current build versus what is still planned.
 
 ## Related project
 
