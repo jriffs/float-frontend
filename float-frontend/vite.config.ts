@@ -28,5 +28,16 @@ export default defineConfig({
 			}) */
 		    adapter: adapter()
 		})
-	]
+	],
+	resolve: {
+		// Helps client/shared resolution
+		conditions: ['browser', 'module', 'import', 'default']
+	  },
+  	ssr: {
+		// Crucial for Cloudflare / workerd server builds
+		resolve: {
+		  conditions: ['workerd', 'worker', 'browser', 'module', 'import', 'default'],
+		  externalConditions: ['workerd', 'worker', 'browser', 'module', 'import', 'default']
+		}
+	  }
 });
