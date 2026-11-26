@@ -5,5 +5,7 @@ export const variables = defineEnvVars({
 	PUBLIC_SUPABASE_ANON_KEY: { public: true, static: true },
 	PUBLIC_SOLANA_RPC_URL: { public: true, static: true },
 	PUBLIC_FLOAT_PROGRAM_ID: { public: true, static: true },
-	PUBLIC_USDC_MINT: { public: true, static: true }
+	PUBLIC_USDC_MINT: { public: true, static: true },
+	PUBLIC_KAMINO_RESOLVER_URL: { public: true, static: true },
+	PUBLIC_KAMINO_RESOLVER_API_KEY: { public: true, static: true }
 });

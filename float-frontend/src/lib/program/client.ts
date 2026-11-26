@@ -19,14 +19,7 @@ import { groupPda, memberBalancePda, expensePda, poolPda } from './pdas.ts';
 import { decodeGroup, decodeMemberBalance, decodeExpense, decodePool } from './decode.ts';
 import type { GroupAccount, MemberBalanceAccount, ExpenseAccount, PoolAccount } from './types.ts';
 import { mapProgramError } from './errors.ts';
-import {
-	DEVNET_KAMINO_VAULT_ADDRESS,
-	resolveKaminoAccounts,
-	buildDeployToKaminoAccounts,
-	buildRecallFromKaminoAccounts,
-	createPoolSharesAtaIx,
-	type FloatKaminoContext
-} from './kamino.ts';
+import { fetchKaminoResolve } from './kamino-resolve.ts';
 
 export type WalletAdapter = BaseMessageSignerWalletAdapter;
 
@@ -570,28 +563,48 @@ export async function deployToKamino(params: {
 	adapter: WalletAdapter;
 	creator: PublicKey;
 	groupName: string;
-	vaultAddress?: string;
 }): Promise<{ signature: TransactionSignature }> {
-	const { adapter } = params;
-	if (!adapter.publicKey?.equals(params.creator)) {
+	const { adapter, creator, groupName } = params;
+	if (!adapter.publicKey?.equals(creator)) {
 		throw mapProgramError(new Error('Only the group creator can deploy'), 'deployToKamino');
 	}
 
+	const groupPk = groupPda(creator, groupName);
+	const g = await fetchGroup(groupPk);
+	if (!g?.poolEnabled) {
+		throw mapProgramError(new Error('Pool is not enabled'), 'deployToKamino');
+	}
+
+	const resolved = await fetchKaminoResolve({
+		group: groupPk.toBase58(),
+		creator: creator.toBase58(),
+		settlementMint: g.settlementMint.toBase58(),
+		groupName
+	});
+
+	// Prefer resolver maps; ensure signer keys match connected wallet
+	const accounts = {
+		...resolved.deployAccounts,
+		creator: adapter.publicKey!,
+		creatorAuthority: creator
+	};
+
+	const sharesMint = resolved.sharesMint;
+	const pool = accounts.pool;
+	const createAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+		adapter.publicKey!,
+		getAssociatedTokenAddressSync(sharesMint, pool, true),
+		pool,
+		sharesMint,
+		TOKEN_PROGRAM_ID
+	);
+
+	const prog = program(adapter);
 	try {
-		const ctx = await kaminoCtx(params);
-		const { accounts, remainingAccounts } = buildDeployToKaminoAccounts(ctx);
-
-		const createAtaIx = createPoolSharesAtaIx({
-			payer: adapter.publicKey!,
-			poolPda: ctx.poolPda,
-			sharesMint: accounts.sharesMint as PublicKey,
-			sharesTokenProgram: accounts.sharesTokenProgram as PublicKey | undefined
-		});
-
-		const ix = await ctx.program.methods
-			.deployToKamino(ctx.groupName)
+		const ix = await prog.methods
+			.deployToKamino(groupName)
 			.accounts(accounts as any)
-			.remainingAccounts(remainingAccounts)
+			.remainingAccounts(resolved.deployRemaining)
 			.instruction();
 
 		const sig = await send(
@@ -609,21 +622,35 @@ export async function recallFromKamino(params: {
 	adapter: WalletAdapter;
 	creator: PublicKey;
 	groupName: string;
-	vaultAddress?: string;
 }): Promise<{ signature: TransactionSignature }> {
-	const { adapter } = params;
-	if (!adapter.publicKey?.equals(params.creator)) {
+	const { adapter, creator, groupName } = params;
+	if (!adapter.publicKey?.equals(creator)) {
 		throw mapProgramError(new Error('Only the group creator can recall'), 'recallFromKamino');
 	}
 
-	try {
-		const ctx = await kaminoCtx(params);
-		const { accounts, remainingAccounts } = buildRecallFromKaminoAccounts(ctx);
+	const groupPk = groupPda(creator, groupName);
+	const g = await fetchGroup(groupPk);
+	if (!g) throw mapProgramError(new Error('Group not found'), 'recallFromKamino');
 
-		const ix = await ctx.program.methods
-			.recallFromKamino(ctx.groupName)
+	const resolved = await fetchKaminoResolve({
+		group: groupPk.toBase58(),
+		creator: creator.toBase58(),
+		settlementMint: g.settlementMint.toBase58(),
+		groupName
+	});
+
+	const accounts = {
+		...resolved.recallAccounts,
+		creator: adapter.publicKey!,
+		creatorAuthority: creator
+	};
+
+	const prog = program(adapter);
+	try {
+		const ix = await prog.methods
+			.recallFromKamino(groupName)
 			.accounts(accounts as any)
-			.remainingAccounts(remainingAccounts)
+			.remainingAccounts(resolved.recallRemaining)
 			.instruction();
 
 		const sig = await send(adapter, new Transaction().add(ix), 'recallFromKamino');
