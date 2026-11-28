@@ -14,8 +14,8 @@
   <tr>
     <td align="center" width="100%">
       <br>
-      <h2>👉 <a href="https://034a6c42.floatfinance.pages.dev/">TRY THE LIVE DEMO</a> 👈</h2>
-      <p><strong>https://034a6c42.floatfinance.pages.dev/</strong></p>
+      <h2>👉 <a href="https://08e62ad5.floatfinance.pages.dev">TRY THE LIVE DEMO</a> 👈</h2>
+      <p><strong>https://08e62ad5.floatfinance.pages.dev</strong></p>
       <br>
       <p>⚠️ <strong>The app is still under active development.</strong><br>
       Only the colored steps below are currently implemented.<br>
